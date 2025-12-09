@@ -1,0 +1,58 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!README.md
+docs/
+API_MIGRATION_ANALYSIS.md
+SETUP_GUIDE.md
+
+# Development files
+.env
+.env.*
+!.env.example
+
+# Node modules (will be installed in container)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test and coverage
+coverage/
+.nyc_output/
+test/
+tests/
+*.test.js
+*.spec.js
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Cache
+.cache/
+.npm/
+.eslintcache
+
+# Logs
+logs/
+*.log
+
+# Build artifacts
+dist/
+build/

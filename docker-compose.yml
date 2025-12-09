@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  weatherscan:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: weatherscan-simulator
+    restart: unless-stopped
+
+    # Environment variables from .env file
+    env_file:
+      - .env
+
+    # Port mapping
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+      - "${CORS_PORT:-8081}:8081"
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Resource limits (optional, adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Networks
+    networks:
+      - weatherscan-network
+
+    # Volumes for persistent data (optional)
+    volumes:
+      - weatherscan-cache:/app/.cache
+
+volumes:
+  weatherscan-cache:
+    driver: local
+
+networks:
+  weatherscan-network:
+    driver: bridge
