@@ -1,6 +1,86 @@
 var map, basemap, radarmain, sortedtimestamps, sortedtimestampsmini, satradsortedtimestamps, satellitemap, minimap, minibasemap, miniradar, interval, miniinterval;
 var customMap = false;
 
+// RainViewer radar tile configuration
+var rainViewerConfig = {
+  tileBaseUrl: 'https://tilecache.rainviewer.com',
+  apiUrl: 'https://api.rainviewer.com/public/weather-maps.json',
+  colorScheme: 3, // The Weather Channel style
+  smoothing: 1,
+  tileSize: 256,
+  cachedTimestamps: null,
+  cacheTime: 0,
+  cacheTTL: 5 * 60 * 1000, // 5 minutes
+
+  // Get radar tile URL
+  getRadarTileUrl: function(timestamp) {
+    return `${this.tileBaseUrl}/v2/radar/${timestamp}/{z}/{x}/{y}/${this.tileSize}/${this.colorScheme}_${this.smoothing}.png`;
+  },
+
+  // Get satellite tile URL
+  getSatelliteTileUrl: function(timestamp) {
+    return `${this.tileBaseUrl}/v2/satellite/${timestamp}/{z}/{x}/{y}/${this.tileSize}/0_0.png`;
+  },
+
+  // Fetch available timestamps
+  fetchTimestamps: async function() {
+    // Check cache
+    if (this.cachedTimestamps && (Date.now() - this.cacheTime < this.cacheTTL)) {
+      return this.cachedTimestamps;
+    }
+
+    try {
+      const corsProxy = (typeof apiConfig !== 'undefined' && apiConfig.corsProxy)
+        ? apiConfig.corsProxy.url
+        : '';
+      const response = await fetch(corsProxy + this.apiUrl);
+      const data = await response.json();
+      this.cachedTimestamps = data;
+      this.cacheTime = Date.now();
+      return data;
+    } catch (error) {
+      console.error('Error fetching RainViewer timestamps:', error);
+      if (this.cachedTimestamps) {
+        return this.cachedTimestamps;
+      }
+      throw error;
+    }
+  },
+
+  // Get radar series in weather.com compatible format
+  getRadarSeries: async function() {
+    const data = await this.fetchTimestamps();
+    const past = data.radar?.past || [];
+    const nowcast = data.radar?.nowcast || [];
+    const allFrames = [...past, ...nowcast];
+
+    return {
+      seriesInfo: {
+        twcRadarMosaic: {
+          series: allFrames.map(frame => ({ ts: frame.time }))
+        },
+        radar: {
+          series: allFrames.map(frame => ({ ts: frame.time }))
+        }
+      }
+    };
+  },
+
+  // Get satellite series
+  getSatelliteSeries: async function() {
+    const data = await this.fetchTimestamps();
+    const infrared = data.satellite?.infrared || [];
+
+    return {
+      seriesInfo: {
+        satrad: {
+          series: infrared.map(frame => ({ ts: frame.time }))
+        }
+      }
+    };
+  }
+};
+
 function initBasemaps() {
 	//main map
 	mapboxgl.accessToken = map_key
@@ -49,7 +129,8 @@ function initBasemaps() {
 				'raster-tiles': {
 				'type': 'raster',
 				'tiles': [
-				'https://api.weather.com/v3/TileServer/tile/radar?ts=1648291200&xyz={x}:{y}:{z}&apiKey=' + api_key
+				// RainViewer radar tiles - timestamp will be updated dynamically
+				rainViewerConfig.getRadarTileUrl(Math.floor(Date.now() / 1000))
 				],
 				'tileSize': 256,
 				}
@@ -761,7 +842,8 @@ function initBasemaps() {
 				'raster-tiles': {
 				'type': 'raster',
 				'tiles': [
-				'https://api.weather.com/v3/TileServer/tile/twcRadarMosaic?ts=1648291200&xyz={x}:{y}:{z}&apiKey=' + api_key
+				// RainViewer radar tiles - timestamp will be updated dynamically
+				rainViewerConfig.getRadarTileUrl(Math.floor(Date.now() / 1000))
 				],
 				'tileSize': 256,
 				}
@@ -1197,8 +1279,8 @@ function loadRadarImages(divID) {
 		    satellitemap.removeLayer(`satradlayer_${timestamp.ts}`)
 			});
 		}
-		fetch("https://api.weather.com/v3/TileServer/series/productSet/PPAcore?filter=satrad&apiKey=" + api_key)
-	    .then(timestampsobj => timestampsobj.json())
+		// Use RainViewer for satellite data
+		rainViewerConfig.getSatelliteSeries()
 	    .then(data => {
 				sortedtimestampsforfetch = data.seriesInfo.satrad.series.sort(function(a,b) {
 					return a.ts - b.ts;
@@ -1211,9 +1293,9 @@ function loadRadarImages(divID) {
 	          source: {
 	            type: "raster",
 	            tiles: [
-								`https://api.weather.com/v3/TileServer/tile/satrad?ts=${timestamp.ts}&xyz={x}:{y}:{z}&apiKey=` + api_key
+								rainViewerConfig.getSatelliteTileUrl(timestamp.ts)
 	            ],
-	            tileSize: 512
+	            tileSize: 256
 	          },
 	          layout: { visibility: "visible" },
 						paint: {'raster-fade-duration': .5, 'raster-opacity':0,'raster-brightness-max':1},
@@ -1224,8 +1306,8 @@ function loadRadarImages(divID) {
 			})
 		}
 	if (divID != 'satrad-1') {
-	fetch("https://api.weather.com/v3/TileServer/series/productSet/PPAcore?filter=twcRadarMosaic&apiKey=" + api_key)
-    .then(timestampsobj => timestampsobj.json())
+	// Use RainViewer for radar data
+	rainViewerConfig.getRadarSeries()
     .then(data => {
 			sortedtimestampsforfetch = data.seriesInfo.twcRadarMosaic.series.sort(function(a,b) {
 				return a.ts - b.ts;
@@ -1238,9 +1320,9 @@ function loadRadarImages(divID) {
           source: {
             type: "raster",
             tiles: [
-							`https://api.weather.com/v3/TileServer/tile/twcRadarMosaic?ts=${timestamp.ts}&xyz={x}:{y}:{z}&apiKey=` + api_key
+							rainViewerConfig.getRadarTileUrl(timestamp.ts)
             ],
-            tileSize: 512
+            tileSize: 256
           },
           layout: { visibility: "visible" },
 					paint: {'raster-fade-duration': .5, 'raster-opacity':0,'raster-brightness-max':0.9},
@@ -1253,9 +1335,9 @@ function loadRadarImages(divID) {
           source: {
             type: "raster",
             tiles: [
-							`https://api.weather.com/v3/TileServer/tile/twcRadarMosaic?ts=${timestamp.ts}&xyz={x}:{y}:{z}&apiKey=` + api_key
+							rainViewerConfig.getRadarTileUrl(timestamp.ts)
             ],
-            tileSize: 512
+            tileSize: 256
           },
           layout: { visibility: "visible" },
 					paint: {'raster-fade-duration': .5,'raster-opacity':0,'raster-brightness-max':0.9},
@@ -1417,10 +1499,11 @@ function Radar(divIDin, intervalHoursIn, zoomIn, latitudeIn, longitudeIn, withSa
 
 		} else {
 		if (withSat == true) {
-			$.getJSON("https://api.weather.com/v3/TileServer/series/productSet/PPAcore?filter=satrad&apiKey=" + api_key, function(data) {
+			// Use RainViewer for satellite data
+			rainViewerConfig.getSatelliteSeries().then(function(data) {
 				for (var i = 0; i < data.seriesInfo.satrad.series.length; i++) {
 					timeLayers.push(
-						L.tileLayer("https://api.weather.com/v3/TileServer/tile/satrad?ts="+ data.seriesInfo.satrad.series[i].ts +"&xyz={x}:{y}:{z}&apiKey=" + api_key, {
+						L.tileLayer(rainViewerConfig.getSatelliteTileUrl(data.seriesInfo.satrad.series[i].ts), {
 							opacity: 0
 					}))
 				}
@@ -1430,10 +1513,11 @@ function Radar(divIDin, intervalHoursIn, zoomIn, latitudeIn, longitudeIn, withSa
 	        });
 			});
 		} else {
-		$.getJSON("https://api.weather.com/v3/TileServer/series/productSet/PPAcore?filter=radar&apiKey=" + api_key, function(data) {
+		// Use RainViewer for radar data
+		rainViewerConfig.getRadarSeries().then(function(data) {
 			for (var i = 0; i < data.seriesInfo.radar.series.length; i++) {
 				timeLayers.push(
-					L.tileLayer("https://api.weather.com/v3/TileServer/tile/radar?ts="+ data.seriesInfo.radar.series[i].ts +"&xyz={x}:{y}:{z}&apiKey=" + api_key, {
+					L.tileLayer(rainViewerConfig.getRadarTileUrl(data.seriesInfo.radar.series[i].ts), {
 						opacity: 0
 				}))
 			}

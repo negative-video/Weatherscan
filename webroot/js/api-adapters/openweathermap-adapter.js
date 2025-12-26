@@ -7,8 +7,14 @@
  */
 
 class OpenWeatherMapAdapter {
-  constructor(apiKey, corsProxyUrl = 'http://localhost:8081/') {
+  constructor(apiKey, corsProxyUrl = null) {
     this.apiKey = apiKey;
+    // Auto-detect CORS proxy URL if not provided
+    if (!corsProxyUrl && typeof detectCorsProxyUrl === 'function') {
+      corsProxyUrl = detectCorsProxyUrl();
+    } else if (!corsProxyUrl) {
+      corsProxyUrl = 'http://localhost:8081/';
+    }
     this.corsProxyUrl = corsProxyUrl;
     this.baseUrl = 'https://api.openweathermap.org';
     this.cache = new Map();
