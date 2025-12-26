@@ -1,133 +1,200 @@
 # Weatherscan IntelliStar Simulator
 
-Weatherscan simulation in HTML/JS/CSS with **easily accessible weather APIs** (OpenWeatherMap + RainViewer)
+A web-based recreation of the classic Weatherscan IntelliStar cable TV weather display, powered by **free, publicly accessible APIs**.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D16-brightgreen.svg)](https://nodejs.org/)
 
-Visit https://weatherscan.me/?Philadelphia for a demo
+---
+
+## About This Fork
+
+The original Weatherscan project relied on the proprietary weather.com API, which requires special access arrangements. **This fork replaces all weather.com API calls with free alternatives**:
+
+| Data Type | Original API | Replacement | Cost |
+|-----------|-------------|-------------|------|
+| Weather Data | weather.com | OpenWeatherMap | Free (1,000 calls/day) |
+| Radar Tiles | weather.com | RainViewer | Free (unlimited) |
+| Satellite | weather.com | RainViewer | Free (unlimited) |
+| Map Tiles | Mapbox | Mapbox | Free (50,000 loads/month) |
+
+**How it works**: A compatibility bridge (`weather-bridge.js`) intercepts all legacy weather.com API calls and transparently routes them through the new adapters. The original application code works without modification.
 
 ---
 
-## 🎉 New: Migrated to Free & Accessible APIs!
-
-This fork has been **completely migrated** to use publicly accessible weather APIs:
-- ✅ **OpenWeatherMap** (free tier: 1,000 calls/day) - [Get API Key](https://openweathermap.org/api)
-- ✅ **RainViewer** (completely free) - No API key needed!
-- ✅ **Mapbox** (free tier: 50,000 loads/month) - [Get API Key](https://www.mapbox.com/)
-
-**All APIs are publicly accessible with free tiers.** No special arrangements needed!
-
----
-
-## 🚀 Quick Start (Docker - Recommended)
+## Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose installed
-- OpenWeatherMap API key ([sign up here](https://openweathermap.org/api))
-- Mapbox API key ([sign up here](https://www.mapbox.com/))
 
-### Setup (3 minutes)
+You'll need **two free API keys** before starting:
+
+1. **OpenWeatherMap API Key** (required)
+   - Sign up at https://openweathermap.org/api
+   - Free tier: 1,000 API calls/day
+   - Note: Keys take ~10 minutes to activate after creation
+
+2. **Mapbox API Key** (required)
+   - Sign up at https://www.mapbox.com/
+   - Free tier: 50,000 map loads/month
+   - Copy your "Default public token" from the dashboard
+
+---
+
+### Option A: Docker (Recommended)
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/your-fork/Weatherscan.git
+# Clone the repository
+git clone https://github.com/negative-video/Weatherscan.git
 cd Weatherscan
 
-# 2. Copy environment template
+# Create your environment file
 cp .env.example .env
 
-# 3. Edit .env and add your API keys
-# OPENWEATHER_API_KEY=your_key_here
-# MAPBOX_API_KEY=your_key_here
-nano .env  # or use your preferred editor
-
-# 4. Start the application
-docker-compose up -d
-
-# 5. Open your browser
-# http://localhost:8080
+# Edit .env and add your API keys
+nano .env
 ```
 
-That's it! 🎊
-
-### View Logs
+Add your keys to `.env`:
 ```bash
-docker-compose logs -f
+OPENWEATHER_API_KEY=your_openweathermap_key_here
+MAPBOX_API_KEY=your_mapbox_key_here
 ```
 
-### Stop Application
+Start the application:
 ```bash
-docker-compose down
+docker compose up -d
+
+# View logs to verify startup
+docker compose logs -f
 ```
+
+Open http://localhost:8080 in your browser.
 
 ---
 
-## 💻 Running Locally (Without Docker)
-
-### Prerequisites
-- [Node.js 16+](https://nodejs.org/en/) installed
-- OpenWeatherMap API key
-- Mapbox API key
-
-### Installation
+### Option B: Local Development (Node.js)
 
 ```bash
-# 1. Install dependencies
+# Clone and install
+git clone https://github.com/negative-video/Weatherscan.git
+cd Weatherscan
 npm install
 
-# 2. Configure API keys
-# Edit webroot/js/config.js:
-var api_key = 'your_openweathermap_api_key';
-var map_key = 'your_mapbox_api_key';
+# Configure API keys in config.js
+nano webroot/js/config.js
+```
 
-# 3. Start the application
+Set your keys at the top of `config.js`:
+```javascript
+var api_key = 'your_openweathermap_key_here';
+var map_key = 'your_mapbox_key_here';
+```
+
+Start the application:
+```bash
 npm start
+```
 
-# 4. Open http://localhost:8080 in your browser
+Open http://localhost:8080 in your browser.
+
+---
+
+## Setting Your Location
+
+### Via URL (Easiest)
+```
+http://localhost:8080/?Philadelphia
+http://localhost:8080/?New York, NY
+http://localhost:8080/?90210
+http://localhost:8080/?London, UK
+```
+
+### Via Configuration
+Edit `webroot/js/config.js` and modify the `locationSettings` object:
+```javascript
+var locationSettings = {
+  mainLocation: {
+    displayName: "Philadelphia",
+    searchQuery: {
+      type: "city",
+      val: "Philadelphia",
+      country: "US",
+      state: "PA"
+    }
+  }
+};
 ```
 
 ---
 
-## 📚 Documentation
+## What You'll See
 
-- **[Complete Setup Guide](SETUP_GUIDE.md)** - Comprehensive setup instructions
-- **[API Migration Analysis](API_MIGRATION_ANALYSIS.md)** - Detailed technical analysis
-- **[Integration Examples](webroot/js/weather-integration-example.js)** - Code examples
+Once running, Weatherscan displays a continuous loop of weather information:
 
----
+- **Current Conditions** - Temperature, humidity, wind, pressure, visibility
+- **Local Radar** - Animated weather radar from RainViewer
+- **Hourly Forecast** - Next 48 hours
+- **5-Day Forecast** - Extended outlook
+- **Weather Alerts** - Active watches and warnings for your area
+- **Nearby Cities** - Conditions in surrounding areas
 
-## 🌟 Features
-
-### Weather Data
-- ✅ Current conditions (temperature, humidity, wind, pressure, etc.)
-- ✅ Hourly forecast (48 hours)
-- ✅ Daily forecast (8 days, up from 5!)
-- ✅ Weather alerts and warnings
-- ✅ Air quality index
-- ✅ UV index
-- ✅ Animated radar (RainViewer)
-- ✅ Satellite imagery (infrared)
-
-### What's Different from weather.com API?
-| Feature | weather.com | New Implementation | Status |
-|---------|-------------|-------------------|--------|
-| Current conditions | ✅ | ✅ OpenWeatherMap | ✅ 100% |
-| Forecasts | ✅ | ✅ OpenWeatherMap | ✅ 100% |
-| Radar tiles | ✅ | ✅ RainViewer | ✅ 100% |
-| Satellite | ✅ | ✅ RainViewer | ✅ 100% |
-| Weather alerts | ✅ | ✅ OpenWeatherMap | ✅ 100% |
-| Air quality | ✅ | ✅ OpenWeatherMap | ✅ 100% |
-| UV index | ✅ | ✅ OpenWeatherMap | ✅ 100% |
-| Pollen data | ✅ | ⚠️ Optional (Ambee) | ⚠️ Optional |
-| Health indices | ✅ | ⚠️ Can be calculated | ⚠️ Optional |
-
-**Note**: Pollen and specialized health indices are optional features that can be added via [Ambee API](https://www.getambee.com/) (100 free calls/day) or by removing those slides.
+The display cycles automatically, just like the original Weatherscan channel.
 
 ---
 
-## 🔧 Advanced Configuration
+## Verifying It Works
+
+Check the browser console (F12) for startup messages:
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║          Weatherscan API Configuration Loaded                 ║
+╚══════════════════════════════════════════════════════════════╝
+  Weather API: OpenWeatherMap (One Call 3.0)
+  Radar/Satellite: RainViewer (free, no key required)
+  CORS Proxy: http://localhost:8081/
+✓ OpenWeatherMap adapter initialized
+✓ RainViewer adapter initialized
+```
+
+If you see configuration errors, double-check your API keys.
+
+---
+
+## Troubleshooting
+
+### "API key not configured" error
+- Verify your keys are set in `.env` (Docker) or `config.js` (local)
+- OpenWeatherMap keys take ~10 minutes to activate after creation
+- Check for typos or extra whitespace in your keys
+
+### No weather data loading
+- Open browser DevTools (F12) and check the Console and Network tabs
+- Ensure the CORS proxy is running on port 8081
+- Test your OpenWeatherMap key directly:
+  ```bash
+  curl "https://api.openweathermap.org/data/3.0/onecall?lat=40&lon=-75&appid=YOUR_KEY"
+  ```
+
+### Radar not displaying
+- RainViewer doesn't require an API key - check browser Network tab for tile errors
+- Verify your location has radar coverage (RainViewer primarily covers populated areas)
+
+### Docker issues
+```bash
+# Check if ports are in use
+lsof -i :8080
+lsof -i :8081
+
+# Rebuild from scratch
+docker compose down
+docker compose up --build
+```
+
+---
+
+## Configuration Options
 
 ### Environment Variables (.env)
 
@@ -136,140 +203,88 @@ npm start
 OPENWEATHER_API_KEY=your_key
 MAPBOX_API_KEY=your_key
 
-# Optional
-AMBEE_API_KEY=            # For pollen data (optional)
-HTTP_PORT=8080            # Web server port
-CORS_PORT=8081            # CORS proxy port
-CACHE_TTL_MINUTES=10      # Cache duration
-ENABLE_POLLEN=false       # Enable/disable pollen
-ENABLE_RADAR=true         # Enable/disable radar
-ENABLE_SATELLITE=true     # Enable/disable satellite
+# Server ports (change if conflicts exist)
+HTTP_PORT=8080
+CORS_PORT=8081
+
+# Caching (increase to reduce API calls)
+CACHE_TTL_MINUTES=10
+
+# Optional features
+ENABLE_RADAR=true
+ENABLE_SATELLITE=true
 ```
 
-### Docker Commands
+### Customization (config.js)
 
-```bash
-# Build and start
-npm run docker:compose:build
-
-# Just start
-npm run docker:compose
-
-# Stop
-npm run docker:stop
-
-# Build image only
-npm run docker:build
-
-# Run without compose
-npm run docker:run
-```
-
----
-
-## 🛠️ Development
-
-```bash
-# Install all dependencies (including dev)
-npm install
-
-# Start development server with live reload
-npm run dev
-
-# Build CSS (if using Gulp)
-gulp
-```
-
----
-
-## 📖 API Usage Examples
-
-### Get Weather Data
 ```javascript
-// Wait for APIs to initialize
-window.addEventListener('apisReady', async function() {
-  // Get weather for a location
-  const weather = await weatherAPI.getCompleteWeatherData(40.7128, -74.0060);
+var apperanceSettings = {
+  iconSet: "2010",              // Weather icon style: "2007" or "2010"
+  affilateName: "Your Cable",   // Cable provider name shown on screen
+  corebackgroud: "buildings",   // Background: forest, mountain, city, etc.
+  logoURL: "",                  // Custom logo URL (879x184px)
+};
 
-  console.log('Temperature:', weather.current.temperature + '°F');
-  console.log('Conditions:', weather.current.wxPhraseLong);
-  console.log('5-day forecast:', weather.daily);
-});
+var audioSettings = {
+  enableMusic: true,            // Background music
+  enableNarrations: true,       // Voice announcements
+  narrationType: 'female',      // 'female' or 'allen'
+};
 ```
 
-### Search Locations
+---
+
+## Technical Details
+
+### Architecture
+
+```
+Browser → CORS Proxy (8081) → Free APIs
+              ↓
+         weather-bridge.js (intercepts $.getJSON calls)
+              ↓
+         OpenWeatherMap / RainViewer adapters
+              ↓
+         Transform to weather.com format
+              ↓
+         Existing UI code (unchanged)
+```
+
+### API Compatibility
+
+The bridge transforms OpenWeatherMap responses to match the weather.com format:
+
 ```javascript
-const results = await weatherAPI.searchLocation('Philadelphia', 5);
-console.log('Found locations:', results);
+// OpenWeatherMap response
+{ temp: 72.5, humidity: 65, weather: [{id: 801}] }
+
+// Transformed to weather.com format
+{ temperature: 73, relativeHumidity: 65, iconCode: 30 }
 ```
 
-### Setup Radar
-```javascript
-const timestamps = await radarAPI.getRadarTimestamps();
-const tileUrl = radarAPI.getRadarTileUrl(timestamps.current, z, x, y);
-```
-
-See [weather-integration-example.js](webroot/js/weather-integration-example.js) for complete examples.
+This allows the original Weatherscan code to work without modification.
 
 ---
 
-## 🐛 Troubleshooting
+## Documentation
 
-### "API key not configured" error
-- Check that your API keys are set in `.env` (Docker) or `config.js` (local)
-- OpenWeatherMap keys take ~10 minutes to activate after creation
-
-### CORS errors
-- Ensure the CORS proxy is running (port 8081)
-- Check Docker logs: `docker-compose logs -f`
-
-### No radar displayed
-- Check browser console for errors
-- Verify RainViewer service is accessible
-- Check network tab in browser DevTools
-
-### Rate limit exceeded
-- Increase `CACHE_TTL_MINUTES` in `.env`
-- Default cache (10 min) uses ~400-800 calls/day (within free tier)
-
-More troubleshooting: [SETUP_GUIDE.md](SETUP_GUIDE.md#troubleshooting)
+- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Detailed setup instructions including Docker and Dockge deployment
+- **[API_MIGRATION_ANALYSIS.md](API_MIGRATION_ANALYSIS.md)** - Technical details of the API replacement
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Overview of changes made
 
 ---
 
-## 🤝 Contributing
+## Performance
 
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License.
+With the default 10-minute cache:
+- ~400-800 API calls/day (well within free tier limits)
+- Weather refreshes every 10 minutes
+- Radar refreshes every 5 minutes
+- Sustainable for 24/7 operation
 
 ---
 
-## 🔗 Resources
-
-- [OpenWeatherMap API Docs](https://openweathermap.org/api/one-call-3)
-- [RainViewer API Docs](https://www.rainviewer.com/api.html)
-- [Mapbox API Docs](https://docs.mapbox.com/)
-- [Original Weatherscan Project](https://github.com/Jessecar96/Weatherscan)
-
----
-
-## 💬 Community
-
-**Stay up to date:**
-- Discord Server: https://discord.gg/WeatherRanch
-- Report Issues: [GitHub Issues](https://github.com/your-fork/Weatherscan/issues)
-
----
-
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Original Weatherscan project by [Jessecar96](https://github.com/Jessecar96)
 - Weather data: [OpenWeatherMap](https://openweathermap.org/)
@@ -278,10 +293,13 @@ This project is licensed under the MIT License.
 
 ---
 
-## ⚡ Performance
+## License
 
-With built-in caching (10-minute TTL):
-- ~400-800 API calls/day (well within free tier of 1,000)
-- Weather refresh: every 10 minutes
-- Radar refresh: every 5 minutes
-- 24/7 operation: ✅ Sustainable on free tier
+MIT License - See LICENSE file for details.
+
+---
+
+## Community
+
+- Discord: https://discord.gg/WeatherRanch
+- Issues: [GitHub Issues](https://github.com/negative-video/Weatherscan/issues)
