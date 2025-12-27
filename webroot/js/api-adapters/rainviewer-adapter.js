@@ -7,7 +7,13 @@
  */
 
 class RainViewerAdapter {
-  constructor(corsProxyUrl = 'http://localhost:8081/') {
+  constructor(corsProxyUrl = null) {
+    // Auto-detect CORS proxy URL if not provided
+    if (!corsProxyUrl && typeof detectCorsProxyUrl === 'function') {
+      corsProxyUrl = detectCorsProxyUrl();
+    } else if (!corsProxyUrl) {
+      corsProxyUrl = 'http://localhost:8081/';
+    }
     this.corsProxyUrl = corsProxyUrl;
     this.apiUrl = 'https://api.rainviewer.com/public/weather-maps.json';
     this.tileBaseUrl = 'https://tilecache.rainviewer.com';
@@ -151,7 +157,7 @@ class RainViewerAdapter {
    * Get satellite series
    */
   async getSatelliteSeries() {
-    const timestamps = await getSatelliteTimestamps();
+    const timestamps = await this.getSatelliteTimestamps();
 
     return {
       series: timestamps.infrared.map(ts => ({
