@@ -18,7 +18,7 @@ class HttpError extends Error {
  * api.weather.gov rejects requests without one, so this is not optional.
  */
 async function getJSON(url, opts = {}) {
-  const { timeoutMs = 12000, retries = 1, headers = {} } = opts;
+  const { timeoutMs = 12000, retries = 2, headers = {} } = opts;
   let lastErr;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -36,9 +36,19 @@ async function getJSON(url, opts = {}) {
       return await res.json();
     } catch (err) {
       lastErr = err;
-      // 4xx responses are deterministic; retrying just burns quota.
-      if (err instanceof HttpError && err.status >= 400 && err.status < 500) break;
-      if (attempt < retries) await sleep(400 * (attempt + 1));
+      // 4xx responses are deterministic and retrying just burns quota — except
+      // 429, which is explicitly "try again later". Free weather APIs return it
+      // when a burst of locations goes out at once, and giving up there leaves
+      // the display blank over something that resolves in a second or two.
+      const retryable = !(err instanceof HttpError) ||
+        err.status === 429 || err.status >= 500;
+      if (!retryable) break;
+      if (attempt < retries) {
+        const backoff = err instanceof HttpError && err.status === 429
+          ? 1500 * (attempt + 1)
+          : 400 * (attempt + 1);
+        await sleep(backoff);
+      }
     } finally {
       clearTimeout(timer);
     }

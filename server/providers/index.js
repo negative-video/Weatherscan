@@ -9,6 +9,35 @@ const openMeteo = require('./open-meteo');
 const openWeather = require('./openweathermap');
 const homeAssistant = require('./home-assistant');
 
+/**
+ * Upstream concurrency cap.
+ *
+ * A page load asks for every location at once — main city, surrounding towns,
+ * the eight-city panel, ticker cities, travel and international lists — which
+ * is roughly two dozen simultaneous requests. Free weather APIs answer that
+ * burst with 429s. Caching absorbs it on subsequent loads, but the first load
+ * after a cold start still fires everything together, so hold the number of
+ * in-flight upstream fetches down and let the rest queue.
+ */
+const MAX_UPSTREAM_CONCURRENCY = 6;
+let active = 0;
+const waiting = [];
+
+function withLimit(fn) {
+  return new Promise((resolve, reject) => {
+    const run = () => {
+      active++;
+      fn().then(resolve, reject).finally(() => {
+        active--;
+        const next = waiting.shift();
+        if (next) next();
+      });
+    };
+    if (active < MAX_UPSTREAM_CONCURRENCY) run();
+    else waiting.push(run);
+  });
+}
+
 // Cached across calls so we do not re-read /api/config on every request.
 let haInstancePromise = null;
 let haWarned = false;
@@ -76,7 +105,9 @@ function baseProvider(name) {
  */
 async function getWeather(lat, lon) {
   const key = `wx:${round4(lat)},${round4(lon)}`;
-  return cache.wrap(key, config.cache.weatherMs, async () => {
+  // cache.wrap already de-duplicates concurrent callers for the same point;
+  // withLimit caps how many *distinct* points are in flight at once.
+  return cache.wrap(key, config.cache.weatherMs, () => withLimit(async () => {
     const useHA = await shouldUseHomeAssistant(lat, lon);
     const fallbackName =
       config.provider === 'home-assistant' ? config.fallbackProvider : config.provider;
@@ -112,7 +143,7 @@ async function getWeather(lat, lon) {
       console.warn(`[providers] Home Assistant read failed, falling back: ${err.message}`);
       return fallback(lat, lon);
     }
-  });
+  }));
 }
 
 /** Weather for several points at once, sharing the cache. */

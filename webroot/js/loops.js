@@ -172,7 +172,7 @@ function Loops() {
 						$('#forecast-text').fadeIn(0)
 						$('#forecast-title').fadeIn(0)
 						resizeText(weatherInfo.dayDesc.lowerbar.day[0].desc);
-						$('#forecast-title').text(weatherInfo.dayDesc.lowerbar.day[0].name + "'S" + " FORECAST");
+						$('#forecast-title').text(weatherInfo.dayDesc.lowerbar.day[0].name ? weatherInfo.dayDesc.lowerbar.day[0].name + "'S FORECAST" : "");
 					}
 				},
 				text2() {
@@ -191,7 +191,7 @@ function Loops() {
 						$('#forecast-text').fadeIn(0)
 						$('#forecast-title').fadeIn(0)
 						resizeText(weatherInfo.dayDesc.lowerbar.day[1].desc);
-						$('#forecast-title').text(weatherInfo.dayDesc.lowerbar.day[1].name + "'S" + " FORECAST");
+						$('#forecast-title').text(weatherInfo.dayDesc.lowerbar.day[1].name ? weatherInfo.dayDesc.lowerbar.day[1].name + "'S FORECAST" : "");
 					}
 				},
 

@@ -435,7 +435,7 @@ var mainMap
 						$('.info-slide-content.aroundcityinfo').fadeOut(500);
 						$('.city-info-slide .tempunavailable').fadeOut(500).promise().done(function(){
 							$('.city-info-slide').fadeOut(0)
-							$('.city-info-slide #subhead-city').fadeIn(0);
+							$('.city-info-slide .subhead-city').fadeIn(0);
 							wait(0);
 					});
 					}, slideDelay);
@@ -476,7 +476,7 @@ var mainMap
 							});
 						} else {
 							$('.info-slide-content.aroundcityinfo').fadeOut(500).promise().done(function(){
-								//$('.city-info-slide #subhead-city').fadeIn(0);
+								//$('.city-info-slide .subhead-city').fadeIn(0);
 								wait(0);
 							});
 						}
@@ -666,7 +666,7 @@ var mainMap
 			}
 			,almanac() {
 				if (weatherInfo.almanac.noReport == true) {
-					$('.city-info-slide #subhead-city').text(weatherInfo.almanac.displayname);
+					$('.city-info-slide .subhead-city').text(weatherInfo.almanac.displayname);
 					$('.city-info-slide .tempunavailable').fadeIn(500)
 					setTimeout(function() {
 						$('.city-info-slide .tempunavailable').fadeOut(500).promise().done(function(){
@@ -1157,7 +1157,7 @@ var mainMap
 						});
 					}, slideDelay);
 				} else {
-					//$('.city-info-slide #subhead-city').fadeOut(0);
+					//$('.city-info-slide .subhead-city').fadeOut(0);
 				function fillinfo() {
 
 					aidx = (aidx===undefined ? 1 : aidx);
@@ -1284,7 +1284,7 @@ var mainMap
 					setTimeout(function() {
 						$('.info-slide-content.severe-aroundcityinfo').fadeOut(500);
 						$('.severe-city-info-slide .tempunavailable').fadeOut(500).promise().done(function(){
-							$('.severe-city-info-slide #subhead-city').fadeIn(0);
+							$('.severe-city-info-slide .subhead-city').fadeIn(0);
 							wait(0);
 					});
 					}, slideDelay);
@@ -1325,7 +1325,7 @@ var mainMap
 							});
 						} else {
 							$('.info-slide-content.severe-aroundcityinfo').fadeOut(500).promise().done(function(){
-								$('.severe-city-info-slide #subhead-city').fadeIn(0);
+								$('.severe-city-info-slide .subhead-city').fadeIn(0);
 								wait(0);
 							});
 						}
@@ -1512,7 +1512,7 @@ var mainMap
 			}
 			,severeAlmanac() {
 				if (weatherInfo.almanac.noReport == true) {
-					$('.severe-city-info-slide #subhead-city').text(weatherInfo.almanac.displayname);
+					$('.severe-city-info-slide .subhead-city').text(weatherInfo.almanac.displayname);
 					$('.severe-city-info-slide .tempunavailable').fadeIn(500)
 					setTimeout(function() {
 						$('.severe-city-info-slide .tempunavailable').fadeOut(500).promise().done(function(){
@@ -1672,12 +1672,12 @@ var mainMap
 				$(maindiv[keys[idx].name]).fadeIn(0)
 			}
 			if (mainDivHeaders[keys[idx].name] != '') $(maindiv[keys[idx].name] + ' .subhead-title').text(mainDivHeaders[keys[idx].name].replace('*daytitle*',weatherInfo.dayPart.weatherLocs[location].daytitle).replace('*none*',''));
-			if (mainDivCityHeaders[keys[idx].name] != '') $(maindiv[keys[idx].name] + ' #subhead-city').text(mainDivCityHeaders[keys[idx].name].replace('*currentConditionsLocation*',weatherInfo.currentCond.weatherLocs[location].displayname).replace('*dayPartLocation*',weatherInfo.dayPart.weatherLocs[location].displayname).replace('*dayDescLocation*',weatherInfo.dayDesc.weatherLocs[location].displayname).replace('*extendedForecastLocation*',weatherInfo.fiveDay.weatherLocs[location].displayname).replace('*almanacLocation*',weatherInfo.almanac.displayname).replace('*none*','').replace('*currentConditionsEnding*',slideApperanceSettings.currentConditions.cityHeaderEnding).replace('*dayPartEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*dayDescEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*extendedForecastEnding*',slideApperanceSettings.extendedForecast.cityHeaderEnding).replace('*almanacEnding*',slideApperanceSettings.almanac.cityHeaderEnding).replace('*healthlocation*',weatherInfo.healthforecast.displayname));
+			if (mainDivCityHeaders[keys[idx].name] != '') $(maindiv[keys[idx].name] + ' .subhead-city').text(mainDivCityHeaders[keys[idx].name].replace('*currentConditionsLocation*',weatherInfo.currentCond.weatherLocs[location].displayname).replace('*dayPartLocation*',weatherInfo.dayPart.weatherLocs[location].displayname).replace('*dayDescLocation*',weatherInfo.dayDesc.weatherLocs[location].displayname).replace('*extendedForecastLocation*',weatherInfo.fiveDay.weatherLocs[location].displayname).replace('*almanacLocation*',weatherInfo.almanac.displayname).replace('*none*','').replace('*currentConditionsEnding*',slideApperanceSettings.currentConditions.cityHeaderEnding).replace('*dayPartEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*dayDescEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*extendedForecastEnding*',slideApperanceSettings.extendedForecast.cityHeaderEnding).replace('*almanacEnding*',slideApperanceSettings.almanac.cityHeaderEnding).replace('*healthlocation*',weatherInfo.healthforecast.displayname));
 		}
 		//preload if the next info-slide is not the same.
 		if (maindiv[keys[idx].name] != maindiv[keysNext[preloadIdx].name]) {
 			if (mainDivHeaders[keysNext[preloadIdx].name] != '') $(maindiv[keysNext[preloadIdx].name] + ' .subhead-title').text(mainDivHeaders[keysNext[preloadIdx].name].replace('*daytitle*',weatherInfo.dayPart.weatherLocs[location].daytitle).replace('*none*',''));
-			if (mainDivCityHeaders[keysNext[preloadIdx].name] != '') $(maindiv[keysNext[preloadIdx].name] + ' #subhead-city').text(mainDivCityHeaders[keysNext[preloadIdx].name].replace('*currentConditionsLocation*',weatherInfo.currentCond.weatherLocs[location].displayname).replace('*dayPartLocation*',weatherInfo.dayPart.weatherLocs[location].displayname).replace('*dayDescLocation*',weatherInfo.dayDesc.weatherLocs[location].displayname).replace('*extendedForecastLocation*',weatherInfo.fiveDay.weatherLocs[location].displayname).replace('*almanacLocation*',weatherInfo.almanac.displayname).replace('*none*','').replace('*currentConditionsEnding*',slideApperanceSettings.currentConditions.cityHeaderEnding).replace('*dayPartEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*dayDescEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*extendedForecastEnding*',slideApperanceSettings.extendedForecast.cityHeaderEnding).replace('*almanacEnding*',slideApperanceSettings.almanac.cityHeaderEnding).replace('*healthlocation*',weatherInfo.healthforecast.displayname));
+			if (mainDivCityHeaders[keysNext[preloadIdx].name] != '') $(maindiv[keysNext[preloadIdx].name] + ' .subhead-city').text(mainDivCityHeaders[keysNext[preloadIdx].name].replace('*currentConditionsLocation*',weatherInfo.currentCond.weatherLocs[location].displayname).replace('*dayPartLocation*',weatherInfo.dayPart.weatherLocs[location].displayname).replace('*dayDescLocation*',weatherInfo.dayDesc.weatherLocs[location].displayname).replace('*extendedForecastLocation*',weatherInfo.fiveDay.weatherLocs[location].displayname).replace('*almanacLocation*',weatherInfo.almanac.displayname).replace('*none*','').replace('*currentConditionsEnding*',slideApperanceSettings.currentConditions.cityHeaderEnding).replace('*dayPartEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*dayDescEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*extendedForecastEnding*',slideApperanceSettings.extendedForecast.cityHeaderEnding).replace('*almanacEnding*',slideApperanceSettings.almanac.cityHeaderEnding).replace('*healthlocation*',weatherInfo.healthforecast.displayname));
 			$(maindiv[keysNext[preloadIdx].name]).addClass("preload")
 			$(maindiv[keysNext[preloadIdx].name]).fadeIn(0)
 		}

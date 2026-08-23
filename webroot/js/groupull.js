@@ -148,15 +148,19 @@ function MarqueeMan() {
 				noreportmodeac = true
 			} else {noreportmodeac == false}
 			weatherInfo.ccticker.ccLocs.forEach((ccLoc, i) => {
-				$span = $("<span class=marquee-current id='" + "cclocation" + i + "'></span>").appendTo('#marquee-now');
-				$spanfor = $("<span class=marquee-fore id='" + "cclocation" + i + "'></span>").appendTo('#marquee-now');
+				// Both spans previously took the same id ("cclocation<i>"), which made
+				// every ticker entry a duplicate id in the document. Nothing looks
+				// them up by id — the rotation selects on .marquee-current /
+				// .marquee-fore — so they simply carry the class.
+				$span = $("<span class='marquee-current'></span>").appendTo('#marquee-now');
+				$spanfor = $("<span class='marquee-fore'></span>").appendTo('#marquee-now');
 				$span.text(ccLoc.displayname + ((noreportmodecc == true) ? "" : ccLoc.currentCond.temp + ' ' + ccLoc.currentCond.cond));
 				$spanfor.css('display','none')
 				$span.css('display','none')
 				$spanfor.text(ccLoc.displayname + ((noreportmodefc == true) ? "" : ccLoc.forecast.temp  + ' ' + ccLoc.forecast.cond));
 			});
 			weatherInfo.ccticker.ccairportdelays.forEach((ccAirLoc, i) => {
-				$spanair = $("<span class=marquee-airport id='" + "aclocation" + i + "'></span>").appendTo('#marquee-now');
+				$spanair = $("<span class='marquee-airport'></span>").appendTo('#marquee-now');
 				$spanair.css('display','none')
 				$spanair.text((ccAirLoc.displayname).replace('International',"Int'l")+ ': ' + ((noreportmodeac == true) ? "" : ccAirLoc.temp + ' ' + ccAirLoc.cond + ', ' + ccAirLoc.delay));
 			});
@@ -224,6 +228,11 @@ function MarqueeMan() {
 		refreshMarquee(0);
 		switchToWarningMarquee(0);
 		displayCCTickerData();
+		// The ticker's city data arrives asynchronously and usually lands after
+		// this first render. Without a hook the ticker sat empty until the next
+		// five-minute tick, so the conditions crawl was blank for the opening
+		// minutes of every boot.
+		window.refreshCCTicker = displayCCTickerData;
 		setInterval(function(){
 			displayCCTickerData();
 			switchToWarningMarquee();

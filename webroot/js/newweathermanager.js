@@ -79,6 +79,26 @@ locList = [], citySlideList = [], state, ccTickerCitiesList = [];
 //$.getJSON("http://"+document.location.hostname+":8081/https://services.surfline.com/forecasts/wave?spotId=500927576a2e4300134fbed8", function() {});
 queryString = window.location.search;
 
+var mainLocAttempts = 0;
+
+/**
+ * The location lookup had no failure path at all: any one of its four requests
+ * failing left maincitycoords empty and the whole display blank, permanently,
+ * with no retry. On an unattended screen a few seconds of network trouble at
+ * boot meant a dead display until someone reloaded it by hand.
+ */
+function onMainLocFailed(configFailed) {
+  mainLocAttempts++;
+  var delay = Math.min(60000, 2000 * Math.pow(2, Math.min(mainLocAttempts, 5)));
+  console.warn('[location] lookup failed (attempt ' + mainLocAttempts +
+    '); retrying in ' + Math.round(delay / 1000) + 's');
+  setTimeout(function () {
+    // After a few failures against a configured location, fall through to IP
+    // geolocation rather than retrying something that may simply be wrong.
+    getMainLoc(configFailed || mainLocAttempts >= 3);
+  }, delay);
+}
+
 function getMainLoc(configFailed) {
   if (queryString) {
     $.getJSON("https://api.weather.com/v3/location/search?query="+queryString.split("?")[1]+"&language=en-US&format=json&apiKey=" + api_key, function(data) {
@@ -94,7 +114,7 @@ function getMainLoc(configFailed) {
       grabalmanacSlidesData()
       grabHealthData()
       grabSideandLowerBarData()
-    });
+    }).fail(function () { onMainLocFailed(configFailed); });
   } else if (locationSettings.mainLocation.searchQuery.type && configFailed != true) {
     if (locationSettings.mainLocation.searchQuery.type == "geocode") {
       $.getJSON("https://api.weather.com/v3/location/point?geocode="+ locationSettings.mainLocation.searchQuery.val + "&language=en-US&format=json&apiKey=" + api_key, function(data) {
@@ -110,7 +130,7 @@ function getMainLoc(configFailed) {
         grabalmanacSlidesData()
         grabHealthData()
         grabSideandLowerBarData()
-      });
+      }).fail(function () { onMainLocFailed(configFailed); });
     } else {
       $.getJSON("https://api.weather.com/v3/location/search?query="+locationSettings.mainLocation.searchQuery.val+"&locationType="+locationSettings.mainLocation.searchQuery.type+"&fuzzyMatch="+locationSettings.mainLocation.searchQuery.fuzzy+((locationSettings.mainLocation.searchQuery.country) ? "&countryCode="+locationSettings.mainLocation.searchQuery.country : "")+((locationSettings.mainLocation.searchQuery.state) ? "&adminDistrictCode="+locationSettings.mainLocation.searchQuery.state : "")+"&language=en-US&format=json&apiKey=" + api_key, function(data) {
           cidx = ((locationSettings.mainLocation.searchQuery.searchResultNum && locationSettings.mainLocation.searchQuery.searchResultNum < data.location.placeId.length) ? locationSettings.mainLocation.searchQuery.searchResultNum : 0)
@@ -126,7 +146,7 @@ function getMainLoc(configFailed) {
           grabalmanacSlidesData()
           grabHealthData()
           grabSideandLowerBarData()
-      });
+      }).fail(function () { onMainLocFailed(configFailed); });
     }
   } else {
     // get lat lon from user's ip
@@ -143,7 +163,7 @@ function getMainLoc(configFailed) {
       grabalmanacSlidesData()
       grabHealthData()
       grabSideandLowerBarData()
-    });
+    }).fail(function () { onMainLocFailed(configFailed); });
 
   }
 }
@@ -1335,7 +1355,9 @@ function pullCCTickerData() {
           ccLoc.forecast.cond = (locationdata['v3-wx-forecast-daily-5day'].daypart[0].wxPhraseLong[marqueeidx]).toLowerCase()
           weatherInfo.ccticker.ccLocs.push(ccLoc)
         });
-
+        // Render as soon as the data lands rather than waiting for the marquee's
+        // own five-minute refresh.
+        if (typeof window.refreshCCTicker === 'function') { window.refreshCCTicker(); }
       });
   };
 //loop data collection, slide loops data functions is done based on full cycle
