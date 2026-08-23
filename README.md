@@ -95,6 +95,12 @@ end of the forecast array and hung the browser tab. An off-by-one plus an
 inverted failure guard in the nearby-cities scan. Null-row guards in six slide
 parsers. San Francisco's longitude was missing its minus sign.
 
+**Nothing is fetched from a CDN at boot.** jQuery, the marquee plugin,
+mapbox-gl and maplibre-gl were pulled from googleapis, jsdelivr and unpkg on
+every page load, so a display that could not reach those hosts did not start.
+They are vendored under `webroot/js/vendor/`. Only Mapbox *tiles* are remote at
+runtime, which is unavoidable — that is the tile service.
+
 **Security and packaging.** Removed `cors-anywhere`, which was an
 unauthenticated open forward proxy published to the host — and unnecessary,
 since Open-Meteo and RainViewer both send CORS headers. Dropped every npm
@@ -263,7 +269,8 @@ rewritten. Build against `/api/weather` instead.
 browser
   │
   ├── webroot/            the original IntelliStar frontend (Jessecar96 / buffbears)
-  │     └── js/weatherscan-api.js   redirects legacy calls to the backend
+  │     ├── js/weatherscan-api.js   redirects legacy calls to the backend
+  │     └── js/vendor/              jquery, marquee, mapbox-gl, maplibre-gl
   │
   └── server/             zero-dependency Node HTTP server
         ├── providers/    open-meteo · openweathermap · home-assistant
