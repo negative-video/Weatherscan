@@ -152,11 +152,29 @@ test('nearby returns distinct towns, not repeats of one point', { skip: SKIP }, 
 test('radar series hands back usable tile templates', { skip: SKIP }, async () => {
   const { status, body } = await get('/api/radar/series');
   assert.strictEqual(status, 200);
-  assert.ok(body.radar.frames.length > 0, 'no radar frames');
-  const url = body.radar.frames.at(-1).url;
-  // Frames must use the API's own path, not a reconstructed timestamp URL.
-  assert.match(url, /\/v2\/radar\/[0-9a-f]+\//);
-  assert.ok(url.includes('{z}') && url.includes('{x}') && url.includes('{y}'));
+  assert.strictEqual(typeof body.radar.available, 'boolean');
+  assert.ok(Array.isArray(body.radar.frames));
+
+  // An empty frame list is a legitimate upstream state, not a bug — RainViewer
+  // returns one during ingest gaps, and its satellite feed does so routinely.
+  // Assert the contract of a frame when there is one rather than that the
+  // network happened to be healthy during the test run.
+  if (!body.radar.frames.length) {
+    assert.strictEqual(body.radar.available, false,
+      'available must be false when there are no frames');
+    return;
+  }
+
+  assert.strictEqual(body.radar.available, true);
+  for (const frame of body.radar.frames) {
+    assert.ok(Number.isFinite(frame.ts), 'frame timestamp');
+    // Frames must use the API's own path, not a reconstructed timestamp URL.
+    assert.match(frame.url, /\/v2\/radar\/[0-9a-f]+\//);
+    assert.ok(
+      frame.url.includes('{z}') && frame.url.includes('{x}') && frame.url.includes('{y}'),
+      `frame url is not a tile template: ${frame.url}`
+    );
+  }
 });
 
 test('airport conditions come back for real IATA codes', { skip: SKIP }, async () => {
