@@ -88,11 +88,11 @@ function createStaticHandler(root) {
       ETag: etag,
       'Last-Modified': stat.mtime.toUTCString(),
       'X-Content-Type-Options': 'nosniff',
-      'Cache-Control': LONG_CACHE.has(ext)
-        ? 'public, max-age=604800'
-        : ext === '.html'
-          ? 'no-cache'
-          : 'public, max-age=300',
+      // Media and fonts never change, so cache them hard. Code and markup are
+      // revalidated every time: config.js is a file users are told to edit, and
+      // a max-age on it means an edit appears to do nothing until it expires.
+      // Revalidation is a 304 against the ETag, which costs almost nothing.
+      'Cache-Control': LONG_CACHE.has(ext) ? 'public, max-age=604800' : 'no-cache',
     };
 
     if (req.method === 'HEAD') {

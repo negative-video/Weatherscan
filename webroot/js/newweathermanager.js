@@ -69,7 +69,9 @@ setInterval(
   }
 , 1000);
 //location pull
-var maincitycoords = {name:"",lat:"",lon:""}, marinelocation,
+// displayname is read by the lower bar before the location lookup resolves;
+// leaving it undeclared rendered a literal "UNDEFINED:" on screen.
+var maincitycoords = {name:"",lat:"",lon:"",displayname:""}, marinelocation,
 locList = [], citySlideList = [], state, ccTickerCitiesList = [];
 
 

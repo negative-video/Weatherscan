@@ -438,6 +438,7 @@ var weatherInfoSettings = {
       humid:"",
       dewpt:"",
       pressure:"",
+      pressureTrend:"", //Read by the sidebar; undeclared here printed "pressure undefined".
       wind:"",
       windspeed:"",
       gust:"",
