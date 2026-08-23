@@ -99,6 +99,26 @@ const config = {
     googleKey: env('GOOGLE_POLLEN_API_KEY', ''),
   },
 
+  marquee: {
+    /**
+     * Lower-ticker feeds. Comma-separated RSS, Atom or JSON Feed URLs — a local
+     * RSS-Bridge instance works well, and its format=Json output is the least
+     * fragile to parse. Empty falls back to MARQUEE_MESSAGES.
+     */
+    feeds: env('MARQUEE_FEEDS', '')
+      .split(',')
+      .map((u) => u.trim())
+      .filter((u) => /^https?:\/\//i.test(u)),
+    maxItems: num('MARQUEE_MAX_ITEMS', 12),
+    ttlMs: num('MARQUEE_TTL_MINUTES', 15) * 60000,
+    showSource: bool('MARQUEE_SHOW_SOURCE', true),
+    // Used when no feed is configured, or when every feed fails.
+    messages: env('MARQUEE_MESSAGES', '')
+      .split('|')
+      .map((m) => m.trim())
+      .filter(Boolean),
+  },
+
   features: {
     radar: bool('ENABLE_RADAR', true),
     satellite: bool('ENABLE_SATELLITE', true),
@@ -143,6 +163,13 @@ function describe() {
   lines.push(`satellite       ${config.features.satellite ? 'NASA GIBS (GOES)' : 'disabled'}`);
   lines.push(`alerts          ${config.features.alerts ? 'NWS api.weather.gov' : 'disabled'}`);
   lines.push(`airports        ${config.features.airports ? 'aviationweather.gov + FAA NAS status' : 'disabled'}`);
+  lines.push(
+    `ticker          ${config.marquee.feeds.length
+      ? `${config.marquee.feeds.length} feed(s), refreshed every ${config.marquee.ttlMs / 60000} min`
+      : config.marquee.messages.length
+        ? `${config.marquee.messages.length} static message(s)`
+        : 'no feeds configured (MARQUEE_FEEDS)'}`
+  );
   lines.push(`weather cache   ${config.cache.weatherMs / 60000} min`);
 
   return { lines, problems };

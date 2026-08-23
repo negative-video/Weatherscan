@@ -5,17 +5,59 @@ $(function(){
 	weatherAudio.playCallback = function(tags) {
 		$('.track-info').text('playing "' + tags.title + '" by ' + tags.artist);
 	}
-	setTimeout(function() {
-		switchMarquee2(0)
-	}, 100)
+	loadMarqueeItems().then(function () {
+		switchMarquee2(0);
+	});
+	// Long-running displays should not sit on a stale headline set.
+	setInterval(loadMarqueeItems, marqueeRefreshMs);
 });
+// Lower ticker. Content comes from /api/marquee, which merges whatever RSS,
+// Atom or JSON feeds are configured in MARQUEE_FEEDS. The hardcoded strings in
+// config.js are only a fallback for when no feed is set or every feed fails.
+var marqueeItems = [];
+var marqueeRefreshMs = 15 * 60 * 1000;
+
+function fallbackMarqueeItems() {
+	var ads = (typeof apperanceSettings !== 'undefined' && apperanceSettings.marqueeAd) || [];
+	return ads.filter(function (t) { return typeof t === 'string' && t.trim(); });
+}
+
+function loadMarqueeItems() {
+	return fetch('/api/marquee', {credentials: 'same-origin'})
+		.then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+		.then(function (data) {
+			var items = (data.items || [])
+				.map(function (i) { return i.text; })
+				.filter(function (t) { return typeof t === 'string' && t.trim(); });
+			if (items.length) marqueeItems = items;
+			return marqueeItems;
+		})
+		.catch(function (err) {
+			console.warn('[marquee] feed unavailable, using fallback:', err.message);
+			return marqueeItems;
+		});
+}
+
 function switchMarquee2(idx) {
-	$('#marquee2')
-		.marquee('destroy')
-	$('#marquee2').text(apperanceSettings.marqueeAd[idx])
+	var items = marqueeItems.length ? marqueeItems : fallbackMarqueeItems();
+	if (!items.length) return;
+	// Guard the index: the original compared against length rather than
+	// length - 1, so every cycle ended by rendering "undefined".
+	if (idx >= items.length || idx < 0) idx = 0;
+
+	$('#marquee2').marquee('destroy');
+	$('#marquee2').text(items[idx]);
 	$('#marquee2')
 		.marquee({speed: 170, pauseOnHover: true})
-		.on('finished', function() {switchMarquee2(((idx < apperanceSettings.marqueeAd.length) ? ++idx : 0))});
+		.on('finished', function () {
+			var next = idx + 1;
+			// Pick up newly published headlines when the loop comes back around.
+			if (next >= items.length) {
+				loadMarqueeItems().then(function () { switchMarquee2(0); });
+				return;
+			}
+			switchMarquee2(next);
+		});
 }
 function MarqueeMan() {
 	function switchToWarningMarquee(sidx) {

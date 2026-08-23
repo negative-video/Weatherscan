@@ -12,6 +12,7 @@ const airports = require('./services/airports');
 const almanacService = require('./services/almanac');
 const radar = require('./services/radar');
 const health = require('./services/health');
+const feeds = require('./services/feeds');
 
 /**
  * Everything under /api. Two families live here:
@@ -280,6 +281,7 @@ async function handleModern(req, res, rest, query) {
       features: config.features,
       cache: cache.stats(),
       places: places.stats(),
+      marquee: { feeds: config.marquee.feeds.length, maxItems: config.marquee.maxItems },
       uptimeSeconds: Math.round(process.uptime()),
       node: process.version,
     };
@@ -337,6 +339,15 @@ async function handleModern(req, res, rest, query) {
       )
       .catch(() => []);
     return json(res, 200, Array.isArray(events) ? events : []);
+  }
+
+  /**
+   * Lower-ticker headlines. Only operator-configured feeds are fetched; there is
+   * deliberately no ?url= parameter, so this cannot be used to proxy arbitrary
+   * hosts through the server.
+   */
+  if (rest === '/marquee') {
+    return json(res, 200, await feeds.marqueeItems());
   }
 
   if (rest === '/moon') {
