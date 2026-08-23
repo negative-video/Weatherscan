@@ -5,6 +5,71 @@ RADAR < MAIN CITY < CITY 1 < CITY 2
 */
 var buildHeaderGlobal;
 
+/**
+ * Shared renderer for the Travel and International slides, which draw the same
+ * three-city / three-day layout. The two used to carry duplicated copies of
+ * this code, so the same defects existed twice over:
+ *
+ *   - The day column headers are static "SUN/MON/TUE" in index.html and were
+ *     never updated. The real names are computed into days[].dayName, and after
+ *     3pm local the forecast shifts to start tomorrow, so every column was
+ *     mislabelled by a day for the rest of the evening.
+ *   - A page with fewer than three cities left the unused panes showing the
+ *     previous page's city and temperatures.
+ *   - The "missing city" branch dereferenced the very value it had just found
+ *     to be absent, throwing part-way through the fill and leaving the slide
+ *     half-updated, and wrote a literal source-code string into the low temp.
+ */
+function fillThreeDayPanes(contentClass, cities, aidx) {
+	var root = '.info-slide-content.' + contentClass;
+	var panes = ['toploc', 'midloc', 'botloc'];
+	var days = ['i', 'ii', 'iii'];
+	var start = 3 * aidx - 3;
+	var di = 0;
+
+	for (var i = start; i < start + 3 && i < cities.length; i++, di++) {
+		var city = cities[i];
+		var pane = root + ' .frost-pane.' + panes[di];
+		if (!city) { blankThreeDayPane(pane, days); continue; }
+
+		$(pane + ' .cityname').text(city.displayname);
+		for (var d = 0; d < 3; d++) {
+			var day = (city.days && city.days[d]) || {};
+			var sel = pane + ' .day.' + days[d];
+			$(sel + ' .hightemp').text(day.high != null ? day.high : '');
+			$(sel + ' .lowtemp').text(day.low != null ? day.low : '');
+			getCCicon(sel + ' .icon', day.icon, day.windspeed);
+		}
+	}
+
+	// Anything this page did not fill keeps the last page's contents otherwise.
+	for (; di < panes.length; di++) {
+		blankThreeDayPane(root + ' .frost-pane.' + panes[di], days);
+	}
+
+	// Label the columns with the days actually being shown.
+	var sample = null;
+	for (var si = start; si < start + 3 && si < cities.length; si++) {
+		if (cities[si] && cities[si].days) { sample = cities[si]; break; }
+	}
+	if (sample) {
+		for (var h = 0; h < 3; h++) {
+			var name = sample.days[h] && sample.days[h].dayName;
+			if (name) $(root + ' .daytitle.' + days[h]).text(String(name).toUpperCase());
+		}
+	}
+}
+
+function blankThreeDayPane(pane, days) {
+	$(pane + ' .cityname').text('');
+	for (var d = 0; d < 3; d++) {
+		var sel = pane + ' .day.' + days[d];
+		$(sel + ' .hightemp').text('');
+		$(sel + ' .lowtemp').text('');
+		$(sel + ' .icon').css('background-image', 'none');
+	}
+}
+
 var maindiv = {
 	"localDoppler":".radar-slide",
 	"regionalSatellite":".radar-slide",
@@ -370,7 +435,7 @@ var mainMap
 						$('.info-slide-content.aroundcityinfo').fadeOut(500);
 						$('.city-info-slide .tempunavailable').fadeOut(500).promise().done(function(){
 							$('.city-info-slide').fadeOut(0)
-							$('.city-info-slide #subhead-city').fadeIn(0);
+							$('.city-info-slide .subhead-city').fadeIn(0);
 							wait(0);
 					});
 					}, slideDelay);
@@ -411,7 +476,7 @@ var mainMap
 							});
 						} else {
 							$('.info-slide-content.aroundcityinfo').fadeOut(500).promise().done(function(){
-								//$('.city-info-slide #subhead-city').fadeIn(0);
+								//$('.city-info-slide .subhead-city').fadeIn(0);
 								wait(0);
 							});
 						}
@@ -601,7 +666,7 @@ var mainMap
 			}
 			,almanac() {
 				if (weatherInfo.almanac.noReport == true) {
-					$('.city-info-slide #subhead-city').text(weatherInfo.almanac.displayname);
+					$('.city-info-slide .subhead-city').text(weatherInfo.almanac.displayname);
 					$('.city-info-slide .tempunavailable').fadeIn(500)
 					setTimeout(function() {
 						$('.city-info-slide .tempunavailable').fadeOut(500).promise().done(function(){
@@ -938,8 +1003,13 @@ var mainMap
 				}, 5000);
 			}
 			,internationalForecast(aidx) {
-				var pages = Math.ceil(weatherInfo.travel.cities.length/3);
-				if (weatherInfo.travel.noReport == true) {
+				aidx = (aidx === undefined ? 1 : aidx);
+				// These both read weatherInfo.travel before, left over from the
+				// copy this function was made from. They happened to agree while
+				// both lists held nine cities, so the slide paged correctly by
+				// coincidence rather than by design.
+				var pages = Math.ceil(weatherInfo.international.cities.length / 3);
+				if (weatherInfo.international.noReport == true) {
 					$('.info-slide-content.internationalforecast').fadeIn(500);
 					$('.international .nodata').fadeIn(500)
 					setTimeout(function() {
@@ -949,49 +1019,18 @@ var mainMap
 						});
 					}, slideDelay);
 				} else {
-					//$('.city-info-slide #subhead-city').fadeOut(0);
-					function fillinfo() {
-						aidx = (aidx===undefined ? 1 : aidx);
-						var di = 0;
-						for (var i = 3*aidx - 3; i < 3*aidx && i < weatherInfo.international.cities.length; i++) {
-							var divnumbers = ['toploc','midloc','botloc']
-							if (weatherInfo.international.cities[i]) {
-								$('.info-slide-content.internationalforecast .frost-pane.' + divnumbers[di] + ' .cityname').text(weatherInfo.international.cities[i].displayname);
-								for (var ddi = 0; ddi < 3; ddi++) {
-									var subdivnumbers = ['i','ii','iii']
-									$('.info-slide-content.internationalforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .hightemp').text(weatherInfo.international.cities[i].days[ddi].high);
-									$('.info-slide-content.internationalforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .lowtemp').text(weatherInfo.international.cities[i].days[ddi].low);
-									//$('.info-slide-content.internationalforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .icon').css('background-image', 'url("' + getCCicon(+weatherInfo.international.cities[i].days[ddi].icon, weatherInfo.international.cities[i].days[ddi].windspeed) + '")');
-									getCCicon('.info-slide-content.internationalforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .icon', weatherInfo.international.cities[i].days[ddi].icon, weatherInfo.international.cities[i].days[ddi].windspeed)
-								}
-							} else {
-								var divnumbers = ['toploc','midloc','botloc']
-								$('.info-slide-content.internationalforecast .frost-pane.' + divnumbers[di] + ' .cityname').text(weatherInfo.international.cities[i].displayname);
-								for (var ddi = 0; ddi < 3; ddi++) {
-									var subdivnumbers = ['i','ii','iii']
-									$('.info-slide-content.internationalforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .hightemp').text("");
-									$('.info-slide-content.internationalforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .lowtemp').text("weatherInfo.travel.cities[i].low");
-									$('.info-slide-content.internationalforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .icon').css('background-image', 'url("")');
-								}
-							}
-							di = di + 1
-						}
-					}
-					fillinfo();
+					fillThreeDayPanes('internationalforecast', weatherInfo.international.cities, aidx);
 					$('.info-slide-content.internationalforecast').fadeIn(500);
 					setTimeout( function() {
-
 						if (aidx<pages) {
 							$('.info-slide-content.internationalforecast').fadeOut(500).promise().done(function(){
 								currentDisplay(aidx+1);
-								//fillinfo();
 							});
 						} else {
 							$('.info-slide-content.internationalforecast').fadeOut(500).promise().done(function(){
 								wait(0);
 							});
 						}
-
 					}, slideDelay)
 				}
 			}
@@ -1013,7 +1052,8 @@ var mainMap
 				}, 5000);
 			}
 			,destinationForecast(aidx) {
-				var pages = Math.ceil(weatherInfo.travel.cities.length/3);
+				aidx = (aidx === undefined ? 1 : aidx);
+				var pages = Math.ceil(weatherInfo.travel.cities.length / 3);
 				if (weatherInfo.travel.noReport == true) {
 					$('.info-slide-content.destinationforecast').fadeIn(500);
 					$('.travel .nodata').fadeIn(500)
@@ -1024,46 +1064,15 @@ var mainMap
 						});
 					}, slideDelay);
 				} else {
-					//$('.city-info-slide #subhead-city').fadeOut(0);
-					function fillinfo() {
-						aidx = (aidx===undefined ? 1 : aidx);
-						var di = 0;
-						for (var i = 3*aidx - 3; i < 3*aidx && i < weatherInfo.travel.cities.length; i++) {
-							var divnumbers = ['toploc','midloc','botloc']
-							if (weatherInfo.travel.cities[i]) {
-								$('.info-slide-content.destinationforecast .frost-pane.' + divnumbers[di] + ' .cityname').text(weatherInfo.travel.cities[i].displayname);
-								for (var ddi = 0; ddi < 3; ddi++) {
-									var subdivnumbers = ['i','ii','iii']
-									$('.info-slide-content.destinationforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .hightemp').text(weatherInfo.travel.cities[i].days[ddi].high);
-									$('.info-slide-content.destinationforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .lowtemp').text(weatherInfo.travel.cities[i].days[ddi].low);
-									//$('.info-slide-content.destinationforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .icon').css('background-image', 'url("' + getCCicon(+weatherInfo.travel.cities[i].days[ddi].icon, weatherInfo.travel.cities[i].days[ddi].windspeed) + '")');
-									getCCicon('.info-slide-content.destinationforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .icon', weatherInfo.travel.cities[i].days[ddi].icon, weatherInfo.travel.cities[i].days[ddi].windspeed)
-								}
-							} else {
-								var divnumbers = ['toploc','midloc','botloc']
-								$('.info-slide-content.destinationforecast .frost-pane.' + divnumbers[di] + ' .cityname').text(weatherInfo.travel.cities[i].displayname);
-								for (var ddi = 0; ddi < 3; ddi++) {
-									var subdivnumbers = ['i','ii','iii']
-									$('.info-slide-content.destinationforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .hightemp').text("");
-									$('.info-slide-content.destinationforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .lowtemp').text("weatherInfo.travel.cities[i].low");
-									$('.info-slide-content.destinationforecast .frost-pane.' + divnumbers[di] + ' .day.' + subdivnumbers[ddi] + ' .icon').css('background-image', 'url("")');
-								}
-							}
-							di = di + 1
-						}
-					}
-					fillinfo();
+					fillThreeDayPanes('destinationforecast', weatherInfo.travel.cities, aidx);
 					if (aidx === 1) {
 						weatherAudio.playRegionalforecast();
 					}
-					//fade in
 					$('.info-slide-content.destinationforecast').fadeIn(500);
-					//change pages
 					setTimeout( function() {
 						if (aidx<pages) {
 							$('.info-slide-content.destinationforecast').fadeOut(500).promise().done(function(){
 								currentDisplay(aidx+1);
-								//fillinfo();
 							});
 						} else {
 							$('.info-slide-content.destinationforecast').fadeOut(500).promise().done(function(){
@@ -1073,6 +1082,7 @@ var mainMap
 					}, slideDelay)
 				}
 			},
+
 			// airport
 			airportIntro() {
 				$('.airport-slide-intro .accent').fadeIn(500);
@@ -1147,7 +1157,7 @@ var mainMap
 						});
 					}, slideDelay);
 				} else {
-					//$('.city-info-slide #subhead-city').fadeOut(0);
+					//$('.city-info-slide .subhead-city').fadeOut(0);
 				function fillinfo() {
 
 					aidx = (aidx===undefined ? 1 : aidx);
@@ -1274,7 +1284,7 @@ var mainMap
 					setTimeout(function() {
 						$('.info-slide-content.severe-aroundcityinfo').fadeOut(500);
 						$('.severe-city-info-slide .tempunavailable').fadeOut(500).promise().done(function(){
-							$('.severe-city-info-slide #subhead-city').fadeIn(0);
+							$('.severe-city-info-slide .subhead-city').fadeIn(0);
 							wait(0);
 					});
 					}, slideDelay);
@@ -1315,7 +1325,7 @@ var mainMap
 							});
 						} else {
 							$('.info-slide-content.severe-aroundcityinfo').fadeOut(500).promise().done(function(){
-								$('.severe-city-info-slide #subhead-city').fadeIn(0);
+								$('.severe-city-info-slide .subhead-city').fadeIn(0);
 								wait(0);
 							});
 						}
@@ -1502,7 +1512,7 @@ var mainMap
 			}
 			,severeAlmanac() {
 				if (weatherInfo.almanac.noReport == true) {
-					$('.severe-city-info-slide #subhead-city').text(weatherInfo.almanac.displayname);
+					$('.severe-city-info-slide .subhead-city').text(weatherInfo.almanac.displayname);
 					$('.severe-city-info-slide .tempunavailable').fadeIn(500)
 					setTimeout(function() {
 						$('.severe-city-info-slide .tempunavailable').fadeOut(500).promise().done(function(){
@@ -1662,12 +1672,12 @@ var mainMap
 				$(maindiv[keys[idx].name]).fadeIn(0)
 			}
 			if (mainDivHeaders[keys[idx].name] != '') $(maindiv[keys[idx].name] + ' .subhead-title').text(mainDivHeaders[keys[idx].name].replace('*daytitle*',weatherInfo.dayPart.weatherLocs[location].daytitle).replace('*none*',''));
-			if (mainDivCityHeaders[keys[idx].name] != '') $(maindiv[keys[idx].name] + ' #subhead-city').text(mainDivCityHeaders[keys[idx].name].replace('*currentConditionsLocation*',weatherInfo.currentCond.weatherLocs[location].displayname).replace('*dayPartLocation*',weatherInfo.dayPart.weatherLocs[location].displayname).replace('*dayDescLocation*',weatherInfo.dayDesc.weatherLocs[location].displayname).replace('*extendedForecastLocation*',weatherInfo.fiveDay.weatherLocs[location].displayname).replace('*almanacLocation*',weatherInfo.almanac.displayname).replace('*none*','').replace('*currentConditionsEnding*',slideApperanceSettings.currentConditions.cityHeaderEnding).replace('*dayPartEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*dayDescEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*extendedForecastEnding*',slideApperanceSettings.extendedForecast.cityHeaderEnding).replace('*almanacEnding*',slideApperanceSettings.almanac.cityHeaderEnding).replace('*healthlocation*',weatherInfo.healthforecast.displayname));
+			if (mainDivCityHeaders[keys[idx].name] != '') $(maindiv[keys[idx].name] + ' .subhead-city').text(mainDivCityHeaders[keys[idx].name].replace('*currentConditionsLocation*',weatherInfo.currentCond.weatherLocs[location].displayname).replace('*dayPartLocation*',weatherInfo.dayPart.weatherLocs[location].displayname).replace('*dayDescLocation*',weatherInfo.dayDesc.weatherLocs[location].displayname).replace('*extendedForecastLocation*',weatherInfo.fiveDay.weatherLocs[location].displayname).replace('*almanacLocation*',weatherInfo.almanac.displayname).replace('*none*','').replace('*currentConditionsEnding*',slideApperanceSettings.currentConditions.cityHeaderEnding).replace('*dayPartEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*dayDescEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*extendedForecastEnding*',slideApperanceSettings.extendedForecast.cityHeaderEnding).replace('*almanacEnding*',slideApperanceSettings.almanac.cityHeaderEnding).replace('*healthlocation*',weatherInfo.healthforecast.displayname));
 		}
 		//preload if the next info-slide is not the same.
 		if (maindiv[keys[idx].name] != maindiv[keysNext[preloadIdx].name]) {
 			if (mainDivHeaders[keysNext[preloadIdx].name] != '') $(maindiv[keysNext[preloadIdx].name] + ' .subhead-title').text(mainDivHeaders[keysNext[preloadIdx].name].replace('*daytitle*',weatherInfo.dayPart.weatherLocs[location].daytitle).replace('*none*',''));
-			if (mainDivCityHeaders[keysNext[preloadIdx].name] != '') $(maindiv[keysNext[preloadIdx].name] + ' #subhead-city').text(mainDivCityHeaders[keysNext[preloadIdx].name].replace('*currentConditionsLocation*',weatherInfo.currentCond.weatherLocs[location].displayname).replace('*dayPartLocation*',weatherInfo.dayPart.weatherLocs[location].displayname).replace('*dayDescLocation*',weatherInfo.dayDesc.weatherLocs[location].displayname).replace('*extendedForecastLocation*',weatherInfo.fiveDay.weatherLocs[location].displayname).replace('*almanacLocation*',weatherInfo.almanac.displayname).replace('*none*','').replace('*currentConditionsEnding*',slideApperanceSettings.currentConditions.cityHeaderEnding).replace('*dayPartEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*dayDescEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*extendedForecastEnding*',slideApperanceSettings.extendedForecast.cityHeaderEnding).replace('*almanacEnding*',slideApperanceSettings.almanac.cityHeaderEnding).replace('*healthlocation*',weatherInfo.healthforecast.displayname));
+			if (mainDivCityHeaders[keysNext[preloadIdx].name] != '') $(maindiv[keysNext[preloadIdx].name] + ' .subhead-city').text(mainDivCityHeaders[keysNext[preloadIdx].name].replace('*currentConditionsLocation*',weatherInfo.currentCond.weatherLocs[location].displayname).replace('*dayPartLocation*',weatherInfo.dayPart.weatherLocs[location].displayname).replace('*dayDescLocation*',weatherInfo.dayDesc.weatherLocs[location].displayname).replace('*extendedForecastLocation*',weatherInfo.fiveDay.weatherLocs[location].displayname).replace('*almanacLocation*',weatherInfo.almanac.displayname).replace('*none*','').replace('*currentConditionsEnding*',slideApperanceSettings.currentConditions.cityHeaderEnding).replace('*dayPartEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*dayDescEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*extendedForecastEnding*',slideApperanceSettings.extendedForecast.cityHeaderEnding).replace('*almanacEnding*',slideApperanceSettings.almanac.cityHeaderEnding).replace('*healthlocation*',weatherInfo.healthforecast.displayname));
 			$(maindiv[keysNext[preloadIdx].name]).addClass("preload")
 			$(maindiv[keysNext[preloadIdx].name]).fadeIn(0)
 		}

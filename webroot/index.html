@@ -7,38 +7,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css" integrity="sha512-M2wvCLH6DSRazYeZRIm1JnYyh22purTM+FDB5CsyxtQJYeKq83arPe5wgbNmcFXGqiSH2XR8dT/fJISVA1r/zQ==" crossorigin=""/>
 
-  <link rel="stylesheet" href="js/leaflet/timedimension/leaflet.timedimension.control.min.css"/>
   <link rel="stylesheet" href="css/weatherscan.css"/>
-  <script src='https://api.mapbox.com/mapbox-gl-js/v2.7.0/mapbox-gl.js'></script>
-  <link href='https://api.mapbox.com/mapbox-gl-js/v2.7.0/mapbox-gl.css' rel='stylesheet' />
-  <script src='https://unpkg.com/maplibre-gl@2.1.7/dist/maplibre-gl.js'></script>
-  <link href='https://unpkg.com/maplibre-gl@2.1.7/dist/maplibre-gl.css' rel='stylesheet' />
+  <script src="js/vendor/mapbox-gl.js"></script>
+  <link href="js/vendor/mapbox-gl.css" rel="stylesheet" />
+  <script src="js/vendor/maplibre-gl.js"></script>
+  <link href="js/vendor/maplibre-gl.css" rel="stylesheet" />
 
 </head>
 <body>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="js/vendor/jquery.min.js"></script>
 
 <script type="text/javascript" src="js/jplayer/jquery.jplayer.min.js"></script>
 
-<script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js" integrity="sha512-lInM/apFSqyy1o6s89K4iQUKg6ppXEgsVxT35HbzUupEVRh2Eu9Wdl4tHj7dZO0s1uvplcYGmt3498TtHq+log==" crossorigin=""></script>
-<!--script type="text/javascript" src="https://unpkg.com/leaflet.nontiledlayer/dist/NonTiledLayer.js"></script-->
-<script type="text/javascript" src="js/leaflet/NonTiledLayer.src.js"></script>
-<script type="text/javascript" src="js/leaflet/iso8601.min.js"></script>
-<script type="text/javascript" src="js/leaflet/timedimension/leaflet.timedimension.min.js"></script>
 
 <script src="/js/date_fns.min.js"></script>
-<script src='http://joeiddon.github.io/perlin/perlin.js'></script>
-<script src="https://cdn.jsdelivr.net/npm/jquery.marquee@1.5.0/jquery.marquee.min.js" type="text/javascript"></script>
+<script src="js/perlin.js"></script>
+<script src="js/vendor/jquery.marquee.min.js"></script>
 
 <script type="text/javascript" src="js/config.js"></script>
 <script type="text/javascript" src="js/utils.js"></script>
-<!-- API Adapters for OpenWeatherMap and RainViewer -->
-<script type="text/javascript" src="js/api-config.js"></script>
-<script type="text/javascript" src="js/api-adapters/openweathermap-adapter.js"></script>
-<script type="text/javascript" src="js/api-adapters/rainviewer-adapter.js"></script>
-<script type="text/javascript" src="js/weather-bridge.js"></script>
+
+<!--
+  Backend shim. Must load after jQuery and before newweathermanager.js: it
+  patches $.getJSON synchronously, and newweathermanager.js fires its first
+  requests during script evaluation.
+-->
+<script type="text/javascript" src="js/weatherscan-api.js"></script>
+
 <script type="text/javascript" src="js/radar.js"></script>
 <script type="text/javascript" src="js/audio.js"></script>
 <script type="text/javascript" src="js/groupull.js"></script>
@@ -56,438 +52,17 @@
       <div id="locationname" class="introtext">location name:</div>
       <div id="affilatename" class="introtext">affiliate name:</div>
     </div>
-    <div id="settings" class="introtext" style="display: none">
-      <div id="apperancesettings" class="introtext">appearance settings</div>
-      <div id="locationsettings" class="introtext">location settings</div>
-      <div id="weathersettings" class="introtext">weather settings</div>
-      <div id="other" class="introtext">other settings</div>
-      <div id="savebutton" class="introtext">Save</div>
-    </div>
     <img class="twclogo" src="images/weatherlogos.png"/>
   </div>
-  <div id="appearancesettingspane" class="settingspane" style="display: none">
-    <select name="background" id="background">
-      <option value="oldnologo">old background no nogo</option>
-      <option value="oldnormal">old background twc logo</option>
-      <option value="oldearthday">old background earthday twc logo</option>
-      <option value="nologo">no nogo</option>
-      <option value="normal">twc logo</option>
-      <option value="earthday">earthday twc logo</option>
-      <option value="custom">custom background</option>
-    </select>
-    <select name="sidebar" id="sidebar">
-      <option value="normalsidebar">normal sidebar</option>
-      <option value="2005sidebar">2005 sidebar</option>
-    </select>
-    <select name="citybackground" id="citybackground">
-      <option value="city">city</option>
-      <option value="beach">beach</option>
-      <option value="fence">fence</option>
-      <option value="custom">custom</option>
-    </select>
-    <select name="iconstheme" id="icons">
-      <option value="city">2006-2010</option>
-      <option value="beach">2010-2013</option>
-      <option value="fence">XL Icons</option>
-      <option value="custom">something different</option>
-    </select>
-    <button name= "slide" id="slide"></button>
-  </div>
-  <div id="locationsettingspane" class="settingspane" style="display: none">
-    <div id="weathertitle" class="settingspanetitle">Location Settings</div>
-    <div id="locsearch">
-      <div id="searchbar">
-        <label for="location">location search</label>
-        <input autocomplete="false"type="text" id="locsearch"><br><br>
-      </div>
-      <div id="searchoption">
-        <select name="iconstheme" id="locsearchoption">
-          <option value="city">City</option>
-          <option value="address">Address</option>
-          <option value="zipcode">Zipcode</option>
-          <option value="coords">Coordinates</option>
-        </select>
-      </div>
-      <div id="displayname">
-        <label for="location">display name</label>
-        <input type="text" id="locdisplayname"><br><br>
-      </div>
-      <div id="addlocationbuttons">
-        <button id="setmainloc">Set Main Location</button>
-        <button id="addlocbutton">Add Location</button>
-        <button id="addloc8slide">Add to 8 City Slide</button>
-        <button id="addlocticker">Add to CC Ticker</button>
-      </div>
-      <div id="extralocheader" class="locationheader">Locations
-        <button id="extralocsdata" class="clearalllocs">Clear Extra Locations</button>
-        <button id="resetmainloc">Reset Main Location</button>
-        <button id="extralocation" class="resetotherlocs">Reset Extra Locations</button>
-      </div>
-      <div id="mainlocation">Main Location
-        <div id="locationname">name: </div>
-        <div id="locationdisplayname">display name: </div>
-        <div id="coords">coordinates: </div>
-      </div>
-      <div id="extralocations">
-        <div id="extralocation1" class="extralocation">Extra Location 1
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton" name="fname">Remove Location</button>
-        </div>
-        <div id="extralocation2" class="extralocation">Extra Location 1
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="extralocation3" class="extralocation">Extra Location 1
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-      </div>
-      <div id="city8slide" class="locationheader">8 City Slide Locations
-        <button id="city8slidedata" class="clearalllocs">Clear Extra Locations</button>
-        <button id="8slide" class="resetotherlocs">Reset Extra Locations</button>
-      </div>
-      <div id="City8SlideLocations">
-        <div id="eightslideloc1" class="eightslideloc">Eight City Slide Location 1
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="eightslideloc2" class="eightslideloc">Eight City Slide Location 2
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="eightslideloc3" class="eightslideloc">Eight City Slide Location 3
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="eightslideloc4" class="eightslideloc">Eight City Slide Location 4
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="eightslideloc5" class="eightslideloc">Eight City Slide Location 5
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="eightslideloc6" class="eightslideloc">Eight City Slide Location 6
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="eightslideloc7" class="eightslideloc">Eight City Slide Location 7
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="eightslideloc8" class="eightslideloc">Eight City Slide Location 8
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-      </div>
-      <div id="cctickerheader" class="locationheader">CCTicker Locations
-        <button id="cctickerdata" class="clearalllocs">Clear CCticker Locations</button>
-        <button id="resetcctickerlocs">Reset CCTicker Locations</button>
-      </div>
-      <div id="cctickerlocations">
-        <div id="cctickerloc1" class="cctickerloc">CCTicker Location 1
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="cctickerloc2" class="cctickerloc">CCTicker Location 2
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="cctickerloc3" class="cctickerloc">CCTicker Location 3
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="cctickerloc4" class="cctickerloc">CCTicker Location 4
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="cctickerloc5" class="cctickerloc">CCTicker Location 5
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="cctickerloc6" class="cctickerloc">CCTicker Location 6
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="cctickerloc7" class="cctickerloc">CCTicker Location 7
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="cctickerloc8" class="cctickerloc">CCTicker Location 8
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="cctickerloc9" class="cctickerloc">CCTicker Location 9
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-        <div id="cctickerloc10" class="cctickerloc" style="display:;">CCTicker Location 10
-          <div id="locationname">name: </div>
-          <div id="locationdisplayname">display name: </div>
-          <div id="coords">coordinates: </div>
-          <button class="removelocbutton">Remove Location</button>
-        </div>
-      </div>
-    </div>
-  </div>
-    <div id="weathersettingspane" class="settingspane" style="display: none">
-      <div id="pageleft" class="pagearrow">‹</div>
-      <div id="pageright" class="pagearrow">›</div>
-      <div id="weathertitle" class="settingspanetitle">Weather Data Settings</div>
-
-      <div id="currentconditionspage" class="weathersettingspage" style="display: ">
-      <div id="currenttile" class="weathersettingspagetitle">Current Conditions Slide</div>
-      <div class=setlocname>
-        <label for="8 cities">Current Location Name</label>
-        <input type="text" id="currentlocname" name="fname"><br><br>
-      </div>
-      <div class=selectloc>
-        <label for="8 cities">Selected Location</label>
-        <select name="citybackground" id="citybackground">
-          <option value="city">city</option>
-        </select>
-      </div>
-      <form action="/action_page.php">
-      <div class=textfield>
-        <label for="cc">Current Temperature</label>
-        <input type="text" id="fname" name="currentCond"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="cc">Current Conditions</label>
-        <input type="text" id="fname" name="currentCond"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="cc">Current Icons</label>
-        <input type="text" id="fname" name="currentCond"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="cc">Current Humidity</label>
-        <input type="text" id="fname" name="currentCond"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="cc">Current Dew Point</label>
-        <input type="text" id="fname" name="currentCond"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="cc">Current Pressure</label>
-        <input type="text" id="fname" name="currentCond"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="cc">Pressure Rising/Falling</label>
-        <input type="text" id="fname" name="currentCond"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="cc">Current Wind</label>
-        <input type="text" id="fname" name="currentCond"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="cc">Current Wind</label>
-        <input type="text" id="fname" name="currentCond"><br><br>
-      </div>
-      </form>
-    </div>
-    <div id="daypartpage" class="settingspage" style="display: none">
-      <div id="currenttile" class="weathersettingspagetitle">Daypart Slide</div>
-      <div class=setlocname>
-        <label for="8 cities">Hour Location Name</label>
-        <input type="text" id="hourlocnamei" name="fname"><br><br>
-      </div>
-    <div id="hour1" class="hour"> <div class="sethourtitle">Hour 1</div>
-      <div class=textfield>
-        <label for="8 cities">Hour Time</label>
-        <input type="text" id="hourtimei" name="fname"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="8 cities">Hour Condition</label>
-        <input type="text" id="hourcondi" name="fname"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="8 cities">Hour Icon</label>
-        <input type="text" id="houriconi" name="fname"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="8 cities">Hour Temperatue</label>
-        <input type="text" id="hourtempi" name="fname"><br><br>
-      </div>
-    </div>
-    <div id="hour2" class="hour"> <div class="sethourtitle">Hour 2</div>
-      <div class=textfield>
-        <label for="8 cities">Hour Time</label>
-        <input type="text" id="hourtimeii" name="fname"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="8 cities">Hour Condition</label>
-        <input type="text" id="hourcondii" name="fname"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="8 cities">Hour Icon</label>
-        <input type="text" id="houriconii" name="fname"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="8 cities">Hour Temperatue</label>
-        <input type="text" id="hourtempii" name="fname"><br><br>
-      </div>
-    </div>
-    <div id="hour3" class="hour"> <div class="sethourtitle">Hour 3</div>
-      <div class=textfield>
-        <label for="8 cities">Hour Time</label>
-        <input type="text" id="hourtimeiii" name="fname"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="8 cities">Hour Condition</label>
-        <input type="text" id="hourcondiii" name="fname"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="8 cities">Hour Icon</label>
-        <input type="text" id="houriconiii" name="fname"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="8 cities">Hour Temperatue</label>
-        <input type="text" id="hourtempiii" name="fname"><br><br>
-      </div>
-    </div>
-    <div id="hour4" class="hour"> <div class="sethourtitle">Hour 4</div>
-      <div class=textfield>
-        <label for="8 cities">Hour Time</label>
-        <input type="text" id="hourtimeiv" name="fname"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="8 cities">Hour Condition</label>
-        <input type="text" id="hourcondiv" name="fname"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="8 cities">Hour Icon</label>
-        <input type="text" id="houriconiv" name="fname"><br><br>
-      </div>
-      <div class=textfield>
-        <label for="8 cities">Hour Temperatue</label>
-        <input type="text" id="hourtempiv" name="fname"><br><br>
-      </div>
-    </div>
-    </div>
-    <div id="daypartpage" class="settingspage" style="display: none">
-      <form action="/action_page.php">
-        <label for="8 cities">36-Hour Day</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">36-Hour Forecast</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">36-Hour Location Name</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-    </div>
-    <div id="5day" class="settingspage" style="display: none">
-      <form action="/action_page.php">
-        <label for="8 cities">5-Day Location Name</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">5-Day Name</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">5-Day Condition</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">5-Day Icon</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">5-Day High</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">5-Day Low</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-    </div>
-    <div id="alamanac" class="settingspage" style="display: none">
-      <form action="/action_page.php">
-        <label for="8 cities">Almanac Date</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">Almanac Average High</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">Almanac Average Low</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">Almanac Record High</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">Almanac Record Low</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">Almanac Sunrise</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">Almanac Sunset</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">Almanac MoonPhase</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">Almanac MoonPhase Icon</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-      <form action="/action_page.php">
-        <label for="8 cities">Almanac MoonPhase Date</label>
-        <input type="text" id="fname" name="fname"><br><br>
-      </form>
-    </div>
-    </div>
+  <!--
+    The appearance/location/weather settings panes that used to sit here
+    were never shown (display:none, no JS ever revealed them) and were
+    driven by settings.js, which was itself dead. They were also the source
+    of nearly every duplicated element id in this file - #fname appeared 28
+    times, #locationdisplayname and #coords 22 each - and jQuery's $("#id")
+    only ever matches the first, so those ids were a standing hazard.
+    Configuration lives in js/config.js and .env instead.
+  -->
     <img class="intellistarlogo" src="images/intellistarlogo.png"/>
   </div>
 
@@ -516,7 +91,7 @@
       <!-- CURRENT CONDITIONS AND FORECAST-->
       <div class="info-slide bulletin" style="display: none">
         <div class="info-subheader">
-          <span id="subhead-titlei">WEATHER BULLETIN</span><span id="subhead-noaa" style="display:">FROM THE NATIONAL WEATHER SERVICE</span>
+          <span class="subhead-titlei">WEATHER BULLETIN</span><span id="subhead-noaa" style="display:">FROM THE NATIONAL WEATHER SERVICE</span>
         </div>
         <div class='frost-pane' style="display:None">
           <div class='cityname'>Frankfort Area</div>
@@ -533,7 +108,7 @@
       </div>
       <div class="info-slide severe-city-info-slide" style="display: none">
         <div class="info-subheader">
-          <span id="subhead-titlei"></span><span id="subhead-city"></span>
+          <span class="subhead-titlei"></span><span class="subhead-city"></span>
         </div>
         <div class="info-subheadershadowfix">
           <span class="subhead-title"></span>
@@ -744,44 +319,9 @@
         </div>
 
       </div>
-      <div class="info-slide city-info-slidetest" style="display: none">
-        <div class="info-subheader">
-          <span id="subhead-titlei"></span><span id="subhead-city"></span>
-        </div>
-        <div class="info-subheadershadowfix">
-          <span class="subhead-title"></span>
-        </div>
-        <div class='blue curve left'></div>
-        <div class='blue curve bottom'></div>
-        <div class='yellow curve left'></div>
-        <div class='yellow curve right'></div>
-        <div class='yellow curve right2'></div>
-        <div class='white curve right'></div>
-        <div class='white curve bottom'></div>
-        <div class='noreport' style="display: none">No Report</div>
-        <div class='tempunavailable' style="display: none">Temporarily Unavailable</div>
-        <div class='info-slide-content city-info' style="display:">
-          <div class='frost-pane left'>
-            <div class='labels'></div>
-            <div class='data'></div>
-          </div>
-          <div class='frost-pane right'>
-            <div class='icon'></div>
-            <div class='conditions'></div>
-            <div class='temp'></div>
-          </div>
-        </div>
-
-        <div class='info-slide-content forecast' style="display:none">
-          <div class='frost-pane'>
-            <div class='title'></div>
-            <div class='content'></div>
-          </div>
-        </div>
-      </div>
       <div class="info-slide city-info-slide" style="display: none">
         <div class="info-subheader">
-          <span id="subhead-titlei"></span><span id="subhead-city"></span>
+          <span class="subhead-titlei"></span><span class="subhead-city"></span>
         </div>
         <div class="info-subheadershadowfix">
           <span class="subhead-title"></span>
@@ -1138,7 +678,7 @@
       <!-- AIRPORT -->
       <div class="info-slide airport-slide" style="display: none">
         <div class="info-subheader">
-          <span class="subhead-titlei"></span><span id="subhead-city"></span><span id='subhead-source' style='display:none'>Source: flightaware.com</span>
+          <span class="subhead-titlei"></span><span class="subhead-city"></span><span id='subhead-source' style='display:none'>Source: flightaware.com</span>
         </div>
         <div class="info-subheadershadowfix">
           <span class="subhead-title">Current Airport Conditions</span>
@@ -1213,7 +753,7 @@
     <!-- BOAT & BEACH -->
     <div class="info-slide beach-slide" style="display: none">
       <div class="info-subheader">
-        <span id="subhead-titlei"></span><span id="subhead-city"></span>
+        <span class="subhead-titlei"></span><span class="subhead-city"></span>
       </div>
       <div class="info-subheadershadowfix">
         <span class="subhead-title">Current Surf Report</span>
@@ -1295,7 +835,7 @@
 
   <div class="info-slide health" style="display: none">
     <div class="info-subheader">
-      <span id="subhead-titlei"></span><span id="subhead-city"></span>
+      <span class="subhead-titlei"></span><span class="subhead-city"></span>
     </div>
     <div class="info-subheadershadowfix">
       <span class="subhead-title">Health Forecast</span>
@@ -1716,7 +1256,7 @@
   </div>
   <div class="info-slide golf" style="display: none">
     <div class="info-subheader">
-      <span id="subhead-titlei"></span><span id="subhead-city"></span>
+      <span class="subhead-titlei"></span><span class="subhead-city"></span>
     </div>
     <div class="info-subheadershadowfix">
       <span class="subhead-title">Tee Time Forecast</span>
@@ -1840,7 +1380,7 @@
 </div>
 <div class="info-slide garden" style="display: none">
   <div class="info-subheader">
-    <span id="subhead-titlei"></span><span id="subhead-city"></span>
+    <span class="subhead-titlei"></span><span class="subhead-city"></span>
   </div>
   <div class="info-subheadershadowfix">
     <span class="subhead-title">Gardening Forecast</span>
@@ -1889,7 +1429,7 @@
 </div>
 <div class="info-slide ski" style="display: none">
   <div class="info-subheader">
-    <span id="subhead-titlei"></span><span id="subhead-city"></span>
+    <span class="subhead-titlei"></span><span class="subhead-city"></span>
   </div>
   <div class="info-subheadershadowfix">
     <span class="subhead-title">Ski Report</span>
@@ -1929,8 +1469,9 @@
 
 </div>
 <div class="info-slide travel" style="display: none">
+      <div class='nodata' style="display: none">Data Not Available</div>
   <div class="info-subheader">
-    <span id="subhead-titlei"></span><span id="subhead-city"></span>
+    <span class="subhead-titlei"></span><span class="subhead-city"></span>
   </div>
   <div class="info-subheadershadowfix">
     <span class="subhead-title">Destination Forecasts</span>
@@ -1994,8 +1535,9 @@
   </div>
   </div>
   <div class="info-slide international" style="display: none">
+      <div class='nodata' style="display: none">Data Not Available</div>
     <div class="info-subheader">
-      <span id="subhead-titlei"></span><span id="subhead-city"></span>
+      <span class="subhead-titlei"></span><span class="subhead-city"></span>
     </div>
     <div class="info-subheadershadowfix">
       <span class="subhead-title">International Forecasts</span>
@@ -2104,7 +1646,7 @@
     <div id="forecast-text">
       <div>A few clouds. Low 53. Winds light and variable.</div>
     </div>
-  <div id="normaltiles" class='forecast-tiles' style="display: flex;"><div class="forecast-tile daily weekend"><div class="header">Sun</div><img class="icon" src="images/icons/24.png"><div class="high">83</div><div class="low">56</div></div><div class="forecast-tile daily"><div class="header">Mon</div><img class="icon" src="images/icons/30.png"><div class="high">65</div><div class="low">50</div></div><div class="forecast-tile daily"><div class="header">Tue</div><img class="icon" src="images/icons/24.png"><div class="high">73</div><div class="low">48</div></div><div class="forecast-tile daily"><div class="header">Wed</div><img class="icon" src="images/icons/28.png"><div class="high">77</div><div class="low">47</div></div><div class="forecast-tile daily"><div class="header">Thu</div><img class="icon" src="images/icons/28.png"><div class="high">81</div><div class="low">50</div></div></div>
+  <div id="normaltiles" class='forecast-tiles' style="display: flex;"><div class="forecast-tile daily weekend"><div class="header">Sun</div><img class="icon" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><div class="high">83</div><div class="low">56</div></div><div class="forecast-tile daily"><div class="header">Mon</div><img class="icon" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><div class="high">65</div><div class="low">50</div></div><div class="forecast-tile daily"><div class="header">Tue</div><img class="icon" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><div class="high">73</div><div class="low">48</div></div><div class="forecast-tile daily"><div class="header">Wed</div><img class="icon" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><div class="high">77</div><div class="low">47</div></div><div class="forecast-tile daily"><div class="header">Thu</div><img class="icon" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><div class="high">81</div><div class="low">50</div></div></div>
     <div id="forecast-noreport" style="display:none">Temporarily Unavailable</div>
   </div>
   </div>

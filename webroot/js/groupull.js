@@ -5,17 +5,59 @@ $(function(){
 	weatherAudio.playCallback = function(tags) {
 		$('.track-info').text('playing "' + tags.title + '" by ' + tags.artist);
 	}
-	setTimeout(function() {
-		switchMarquee2(0)
-	}, 100)
+	loadMarqueeItems().then(function () {
+		switchMarquee2(0);
+	});
+	// Long-running displays should not sit on a stale headline set.
+	setInterval(loadMarqueeItems, marqueeRefreshMs);
 });
+// Lower ticker. Content comes from /api/marquee, which merges whatever RSS,
+// Atom or JSON feeds are configured in MARQUEE_FEEDS. The hardcoded strings in
+// config.js are only a fallback for when no feed is set or every feed fails.
+var marqueeItems = [];
+var marqueeRefreshMs = 15 * 60 * 1000;
+
+function fallbackMarqueeItems() {
+	var ads = (typeof apperanceSettings !== 'undefined' && apperanceSettings.marqueeAd) || [];
+	return ads.filter(function (t) { return typeof t === 'string' && t.trim(); });
+}
+
+function loadMarqueeItems() {
+	return fetch('/api/marquee', {credentials: 'same-origin'})
+		.then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+		.then(function (data) {
+			var items = (data.items || [])
+				.map(function (i) { return i.text; })
+				.filter(function (t) { return typeof t === 'string' && t.trim(); });
+			if (items.length) marqueeItems = items;
+			return marqueeItems;
+		})
+		.catch(function (err) {
+			console.warn('[marquee] feed unavailable, using fallback:', err.message);
+			return marqueeItems;
+		});
+}
+
 function switchMarquee2(idx) {
-	$('#marquee2')
-		.marquee('destroy')
-	$('#marquee2').text(apperanceSettings.marqueeAd[idx])
+	var items = marqueeItems.length ? marqueeItems : fallbackMarqueeItems();
+	if (!items.length) return;
+	// Guard the index: the original compared against length rather than
+	// length - 1, so every cycle ended by rendering "undefined".
+	if (idx >= items.length || idx < 0) idx = 0;
+
+	$('#marquee2').marquee('destroy');
+	$('#marquee2').text(items[idx]);
 	$('#marquee2')
 		.marquee({speed: 170, pauseOnHover: true})
-		.on('finished', function() {switchMarquee2(((idx < apperanceSettings.marqueeAd.length) ? ++idx : 0))});
+		.on('finished', function () {
+			var next = idx + 1;
+			// Pick up newly published headlines when the loop comes back around.
+			if (next >= items.length) {
+				loadMarqueeItems().then(function () { switchMarquee2(0); });
+				return;
+			}
+			switchMarquee2(next);
+		});
 }
 function MarqueeMan() {
 	function switchToWarningMarquee(sidx) {
@@ -106,15 +148,19 @@ function MarqueeMan() {
 				noreportmodeac = true
 			} else {noreportmodeac == false}
 			weatherInfo.ccticker.ccLocs.forEach((ccLoc, i) => {
-				$span = $("<span class=marquee-current id='" + "cclocation" + i + "'></span>").appendTo('#marquee-now');
-				$spanfor = $("<span class=marquee-fore id='" + "cclocation" + i + "'></span>").appendTo('#marquee-now');
+				// Both spans previously took the same id ("cclocation<i>"), which made
+				// every ticker entry a duplicate id in the document. Nothing looks
+				// them up by id — the rotation selects on .marquee-current /
+				// .marquee-fore — so they simply carry the class.
+				$span = $("<span class='marquee-current'></span>").appendTo('#marquee-now');
+				$spanfor = $("<span class='marquee-fore'></span>").appendTo('#marquee-now');
 				$span.text(ccLoc.displayname + ((noreportmodecc == true) ? "" : ccLoc.currentCond.temp + ' ' + ccLoc.currentCond.cond));
 				$spanfor.css('display','none')
 				$span.css('display','none')
 				$spanfor.text(ccLoc.displayname + ((noreportmodefc == true) ? "" : ccLoc.forecast.temp  + ' ' + ccLoc.forecast.cond));
 			});
 			weatherInfo.ccticker.ccairportdelays.forEach((ccAirLoc, i) => {
-				$spanair = $("<span class=marquee-airport id='" + "aclocation" + i + "'></span>").appendTo('#marquee-now');
+				$spanair = $("<span class='marquee-airport'></span>").appendTo('#marquee-now');
 				$spanair.css('display','none')
 				$spanair.text((ccAirLoc.displayname).replace('International',"Int'l")+ ': ' + ((noreportmodeac == true) ? "" : ccAirLoc.temp + ' ' + ccAirLoc.cond + ', ' + ccAirLoc.delay));
 			});
@@ -182,6 +228,11 @@ function MarqueeMan() {
 		refreshMarquee(0);
 		switchToWarningMarquee(0);
 		displayCCTickerData();
+		// The ticker's city data arrives asynchronously and usually lands after
+		// this first render. Without a hook the ticker sat empty until the next
+		// five-minute tick, so the conditions crawl was blank for the opening
+		// minutes of every boot.
+		window.refreshCCTicker = displayCCTickerData;
 		setInterval(function(){
 			displayCCTickerData();
 			switchToWarningMarquee();

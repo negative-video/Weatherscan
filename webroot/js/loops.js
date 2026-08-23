@@ -12,8 +12,12 @@ function Loops() {
 }
 	function refreshObservationDisplay() {
 		var cond = weatherInfo.currentCond.sidebar.cond;
-		$('#city').text(maincitycoords.displayname);
-		$('#forecast-city').text(maincitycoords.displayname + ':');
+		// The trailing colon only belongs there once a location has resolved;
+		// appending it unconditionally left a bare ":" on screen during startup
+		// and whenever the location lookup failed.
+		var mainCityName = maincitycoords.displayname || '';
+		$('#city').text(mainCityName);
+		$('#forecast-city').text(mainCityName ? mainCityName + ':' : '');
 		if (weatherInfo.radarTempUnavialable == false) {
 			if (loopssevereweathermode == false){
 				$('#minimap').fadeIn(0)
@@ -168,7 +172,7 @@ function Loops() {
 						$('#forecast-text').fadeIn(0)
 						$('#forecast-title').fadeIn(0)
 						resizeText(weatherInfo.dayDesc.lowerbar.day[0].desc);
-						$('#forecast-title').text(weatherInfo.dayDesc.lowerbar.day[0].name + "'S" + " FORECAST");
+						$('#forecast-title').text(weatherInfo.dayDesc.lowerbar.day[0].name ? weatherInfo.dayDesc.lowerbar.day[0].name + "'S FORECAST" : "");
 					}
 				},
 				text2() {
@@ -187,7 +191,7 @@ function Loops() {
 						$('#forecast-text').fadeIn(0)
 						$('#forecast-title').fadeIn(0)
 						resizeText(weatherInfo.dayDesc.lowerbar.day[1].desc);
-						$('#forecast-title').text(weatherInfo.dayDesc.lowerbar.day[1].name + "'S" + " FORECAST");
+						$('#forecast-title').text(weatherInfo.dayDesc.lowerbar.day[1].name ? weatherInfo.dayDesc.lowerbar.day[1].name + "'S FORECAST" : "");
 					}
 				},
 
