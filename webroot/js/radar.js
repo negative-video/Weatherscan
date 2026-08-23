@@ -1,92 +1,93 @@
 var map, basemap, radarmain, sortedtimestamps, sortedtimestampsmini, satradsortedtimestamps, satellitemap, minimap, minibasemap, miniradar, interval, miniinterval;
 var customMap = false;
 
-// RainViewer radar tile configuration
+// Radar and satellite frame source.
+//
+// Frames come from this project's backend (/api/radar/series) rather than being
+// assembled in the browser. Two reasons: RainViewer identifies each frame by an
+// opaque path that must be read from its API — reconstructing a URL from a bare
+// timestamp returns degraded tiles — and the satellite layer now comes from
+// NASA GIBS, because RainViewer's free infrared feed has been returning zero
+// frames. Keeping both behind one endpoint means this file does not care which
+// upstream is in play.
 var rainViewerConfig = {
-  tileBaseUrl: 'https://tilecache.rainviewer.com',
-  apiUrl: 'https://api.rainviewer.com/public/weather-maps.json',
-  colorScheme: 3, // The Weather Channel style
-  smoothing: 1,
-  tileSize: 256,
-  cachedTimestamps: null,
+  cachedSeries: null,
   cacheTime: 0,
-  cacheTTL: 5 * 60 * 1000, // 5 minutes
+  cacheTTL: 5 * 60 * 1000,
+  radarUrlByTs: {},
+  satelliteUrlByTs: {},
+  // Used before any series has loaded, so the map never requests a bad tile.
+  blankTile: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
 
-  // Get radar tile URL
-  getRadarTileUrl: function(timestamp) {
-    return `${this.tileBaseUrl}/v2/radar/${timestamp}/{z}/{x}/{y}/${this.tileSize}/${this.colorScheme}_${this.smoothing}.png`;
-  },
-
-  // Get satellite tile URL
-  getSatelliteTileUrl: function(timestamp) {
-    return `${this.tileBaseUrl}/v2/satellite/${timestamp}/{z}/{x}/{y}/${this.tileSize}/0_0.png`;
-  },
-
-  // Fetch available timestamps
-  fetchTimestamps: async function() {
-    // Check cache
-    if (this.cachedTimestamps && (Date.now() - this.cacheTime < this.cacheTTL)) {
-      return this.cachedTimestamps;
+  fetchSeries: async function () {
+    if (this.cachedSeries && Date.now() - this.cacheTime < this.cacheTTL) {
+      return this.cachedSeries;
     }
+    const res = await fetch('/api/radar/series', { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('radar series HTTP ' + res.status);
+    const data = await res.json();
 
-    try {
-      const corsProxy = (typeof apiConfig !== 'undefined' && apiConfig.corsProxy)
-        ? apiConfig.corsProxy.url
-        : '';
-      const response = await fetch(corsProxy + this.apiUrl);
-      const data = await response.json();
-      this.cachedTimestamps = data;
-      this.cacheTime = Date.now();
-      return data;
-    } catch (error) {
-      console.error('Error fetching RainViewer timestamps:', error);
-      if (this.cachedTimestamps) {
-        return this.cachedTimestamps;
-      }
-      throw error;
+    this.radarUrlByTs = {};
+    (data.radar.frames || []).forEach((f) => { this.radarUrlByTs[f.ts] = f.url; });
+    this.satelliteUrlByTs = {};
+    (data.satellite.frames || []).forEach((f) => { this.satelliteUrlByTs[f.ts] = f.url; });
+
+    this.cachedSeries = data;
+    this.cacheTime = Date.now();
+    return data;
+  },
+
+  getRadarTileUrl: function (timestamp) {
+    return this.radarUrlByTs[timestamp] || this.blankTile;
+  },
+
+  getSatelliteTileUrl: function (timestamp) {
+    return this.satelliteUrlByTs[timestamp] || this.blankTile;
+  },
+
+  // Shapes below match what the rest of this file already expects.
+  getRadarSeries: async function () {
+    const data = await this.fetchSeries();
+    const series = (data.radar.frames || []).map((f) => ({ ts: f.ts }));
+    return { seriesInfo: { twcRadarMosaic: { series: series }, radar: { series: series } } };
+  },
+
+  getSatelliteSeries: async function () {
+    const data = await this.fetchSeries();
+    const series = (data.satellite.frames || []).map((f) => ({ ts: f.ts }));
+    if (!series.length) {
+      console.warn('[radar] no satellite frames available; the slide will stay empty');
     }
+    return { seriesInfo: { satrad: { series: series } } };
   },
 
-  // Get radar series in weather.com compatible format
-  getRadarSeries: async function() {
-    const data = await this.fetchTimestamps();
-    const past = data.radar?.past || [];
-    const nowcast = data.radar?.nowcast || [];
-    const allFrames = [...past, ...nowcast];
-
-    return {
-      seriesInfo: {
-        twcRadarMosaic: {
-          series: allFrames.map(frame => ({ ts: frame.time }))
-        },
-        radar: {
-          series: allFrames.map(frame => ({ ts: frame.time }))
-        }
-      }
-    };
-  },
-
-  // Get satellite series
-  getSatelliteSeries: async function() {
-    const data = await this.fetchTimestamps();
-    const infrared = data.satellite?.infrared || [];
-
-    return {
-      seriesInfo: {
-        satrad: {
-          series: infrared.map(frame => ({ ts: frame.time }))
-        }
-      }
-    };
+  hasSatellite: function () {
+    return !!(this.cachedSeries && this.cachedSeries.satellite.available);
   }
 };
+
+// Mapbox style IDs are configurable. The defaults point at the upstream
+// author's public styles, which is a dependency on someone else's account
+// staying open; MAPBOX_STYLE_* in .env lets a deployment use its own forks.
+function mapboxStyle(name, fallback) {
+  var cfg = (window.weatherscanConfig && window.weatherscanConfig.mapbox) || {};
+  return cfg[name] || fallback;
+}
+
+function mapboxBaseTiles() {
+  var cfg = (window.weatherscanConfig && window.weatherscanConfig.mapbox) || {};
+  var user = cfg.baseStyleUser || 'goldbblazez';
+  var style = cfg.baseStyleId || 'cl6jfozbb001h15sdx9ze69f7';
+  return 'https://api.mapbox.com/styles/v1/' + user + '/' + style +
+    '/tiles/{z}/{x}/{y}?access_token=' + map_key;
+}
 
 function initBasemaps() {
 	//main map
 	mapboxgl.accessToken = map_key
 	map = new mapboxgl.Map({
 		container: 'radar-3', // container ID
-		style: 'mapbox://styles/goldbblazez/cl10wz58y000q14ptdm3vkmxe', // style URL
+		style: mapboxStyle('radarStyle', 'mapbox://styles/goldbblazez/cl10wz58y000q14ptdm3vkmxe'), // style URL
 		center: [maincitycoords.lon, maincitycoords.lat], // starting position [lng, lat]
 		zoom: 7.7, // starting zoom
 		sprite: "mapbox://sprites/goldbblazez/cl10wz58y000q14ptdm3vkmxe/f2jmfbiv3wccsb4w7xb1prfmc"
@@ -101,7 +102,7 @@ function initBasemaps() {
 				'type': 'raster',
 					'tiles': [
 						//'http://127.0.0.1/cgi-bin/qgis_mapserv.fcgi.exe?map=E:/desktop/mecratorproject/mapprojectforlater.qgz&BBOX={bbox-epsg-3857}&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&CRS=EPSG:3857&WIDTH=512&HEIGHT=512&LAYERS=USA_modified&format=image/png'
-						'https://api.mapbox.com/styles/v1/goldbblazez/cl6jfozbb001h15sdx9ze69f7/tiles/{z}/{x}/{y}?access_token=' + map_key
+						mapboxBaseTiles()
 						//'./test/{z}/{x}/{y}.png'
 					],
 					'tileSize': 512
@@ -771,7 +772,7 @@ function initBasemaps() {
 	//satellitemap
 	satellitemap = new mapboxgl.Map({
 		container: 'satrad-1', // container ID // style URL
-		style: 'mapbox://styles/goldbblazez/cl188bbm3000f14rmh9mcqbp8',
+		style: mapboxStyle('satelliteStyle', 'mapbox://styles/goldbblazez/cl188bbm3000f14rmh9mcqbp8'),
 		center: [maincitycoords.lon, maincitycoords.lat], // starting position [lng, lat]
 		zoom: 4.7, // starting zoom
 		projection: {
@@ -784,7 +785,7 @@ function initBasemaps() {
 		satellitemap.addSource('basemaptiles', {
 			'type': 'raster',
 				'tiles': [
-					'https://api.mapbox.com/styles/v1/goldbblazez/cl6jfozbb001h15sdx9ze69f7/tiles/{z}/{x}/{y}?access_token=' + map_key
+					mapboxBaseTiles()
 				],
 				'tileSize': 512
 			});
@@ -799,7 +800,7 @@ function initBasemaps() {
 	//minimap
 	minimap = new mapboxgl.Map({
 		container: 'minimap-3', // container ID
-		style: 'mapbox://styles/goldbblazez/cl11ctjbl000014s02fijkmyc', // style URL
+		style: mapboxStyle('miniStyle', 'mapbox://styles/goldbblazez/cl11ctjbl000014s02fijkmyc'), // style URL
 		center: [maincitycoords.lon, maincitycoords.lat], // starting position [lng, lat]
 		zoom: 6, // starting zoom
 		sprite: "mapbox://styles/goldbblazez/cl11ctjbl000014s02fijkmyc/f2jmfbiv3wccsb4w7xb1prfmc"
@@ -812,7 +813,7 @@ function initBasemaps() {
 				'raster-tiles': {
 				'type': 'raster',
 					'tiles': [
-						'https://api.mapbox.com/styles/v1/goldbblazez/cl6jfozbb001h15sdx9ze69f7/tiles/{z}/{x}/{y}?access_token=' + map_key
+						mapboxBaseTiles()
 					],
 					'tileSize': 512,
 					'minzoom': 6,
@@ -1471,7 +1472,7 @@ function Radar(divIDin, intervalHoursIn, zoomIn, latitudeIn, longitudeIn, withSa
 		// satellite streets cj8p1qym6976p2rqut8oo6vxr
 		// weatherscan green cj8owq50n926g2smvagdxg9t8
 		// mapbox://styles/goldbblazez/ckgc7fwvr4qmn19pevtvhyabl
-	//	https://api.mapbox.com/styles/v1/goldbblazez/ckgc8lzdz4lzh19qt7q9wbbr9.html?fresh=true&title=copy&access_token=pk.eyJ1IjoiZ29sZGJibGF6ZXoiLCJhIjoiY2tiZTRnb2Q2MGkxajJwbzV2bWd5dXI5MyJ9.jU-2DqGCBI14K-acyN9RCw
+	//	https://api.mapbox.com/styles/v1/goldbblazez/ckgc8lzdz4lzh19qt7q9wbbr9.html?fresh=true&title=copy&access_token=REDACTED
 		/*L.tileLayer('https://api.mapbox.com/styles/v1/goldbblazez/ckgc8lzdz4lzh19qt7q9wbbr9/tiles/{z}/{x}/{y}?access_token=' + map_key, {
 			tileSize: 512,
 			zoomOffset: -1

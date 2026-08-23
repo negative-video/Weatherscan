@@ -29,16 +29,19 @@
 <script type="text/javascript" src="js/leaflet/timedimension/leaflet.timedimension.min.js"></script>
 
 <script src="/js/date_fns.min.js"></script>
-<script src='http://joeiddon.github.io/perlin/perlin.js'></script>
+<script src="js/perlin.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jquery.marquee@1.5.0/jquery.marquee.min.js" type="text/javascript"></script>
 
 <script type="text/javascript" src="js/config.js"></script>
 <script type="text/javascript" src="js/utils.js"></script>
-<!-- API Adapters for OpenWeatherMap and RainViewer -->
-<script type="text/javascript" src="js/api-config.js"></script>
-<script type="text/javascript" src="js/api-adapters/openweathermap-adapter.js"></script>
-<script type="text/javascript" src="js/api-adapters/rainviewer-adapter.js"></script>
-<script type="text/javascript" src="js/weather-bridge.js"></script>
+
+<!--
+  Backend shim. Must load after jQuery and before newweathermanager.js: it
+  patches $.getJSON synchronously, and newweathermanager.js fires its first
+  requests during script evaluation.
+-->
+<script type="text/javascript" src="js/weatherscan-api.js"></script>
+
 <script type="text/javascript" src="js/radar.js"></script>
 <script type="text/javascript" src="js/audio.js"></script>
 <script type="text/javascript" src="js/groupull.js"></script>
@@ -2104,7 +2107,7 @@
     <div id="forecast-text">
       <div>A few clouds. Low 53. Winds light and variable.</div>
     </div>
-  <div id="normaltiles" class='forecast-tiles' style="display: flex;"><div class="forecast-tile daily weekend"><div class="header">Sun</div><img class="icon" src="images/icons/24.png"><div class="high">83</div><div class="low">56</div></div><div class="forecast-tile daily"><div class="header">Mon</div><img class="icon" src="images/icons/30.png"><div class="high">65</div><div class="low">50</div></div><div class="forecast-tile daily"><div class="header">Tue</div><img class="icon" src="images/icons/24.png"><div class="high">73</div><div class="low">48</div></div><div class="forecast-tile daily"><div class="header">Wed</div><img class="icon" src="images/icons/28.png"><div class="high">77</div><div class="low">47</div></div><div class="forecast-tile daily"><div class="header">Thu</div><img class="icon" src="images/icons/28.png"><div class="high">81</div><div class="low">50</div></div></div>
+  <div id="normaltiles" class='forecast-tiles' style="display: flex;"><div class="forecast-tile daily weekend"><div class="header">Sun</div><img class="icon" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><div class="high">83</div><div class="low">56</div></div><div class="forecast-tile daily"><div class="header">Mon</div><img class="icon" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><div class="high">65</div><div class="low">50</div></div><div class="forecast-tile daily"><div class="header">Tue</div><img class="icon" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><div class="high">73</div><div class="low">48</div></div><div class="forecast-tile daily"><div class="header">Wed</div><img class="icon" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><div class="high">77</div><div class="low">47</div></div><div class="forecast-tile daily"><div class="header">Thu</div><img class="icon" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><div class="high">81</div><div class="low">50</div></div></div>
     <div id="forecast-noreport" style="display:none">Temporarily Unavailable</div>
   </div>
   </div>

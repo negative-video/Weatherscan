@@ -1,58 +1,35 @@
-# Git
+# Only server/, webroot/ and package.json are copied into the image; this keeps
+# the build context small and makes sure secrets never enter it.
 .git
 .gitignore
 .gitattributes
+.github/
 
-# Documentation
-*.md
-!README.md
-docs/
-API_MIGRATION_ANALYSIS.md
-SETUP_GUIDE.md
-
-# Development files
 .env
 .env.*
 !.env.example
 
-# Node modules (will be installed in container)
 node_modules/
 npm-debug.log
-yarn-error.log
+package-lock.json
 
-# IDE
+test/
+scripts/
+*.md
+!README.md
+
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
-
-# OS files
 .DS_Store
 Thumbs.db
+*.swp
+*~
 
-# Test and coverage
 coverage/
 .nyc_output/
-test/
-tests/
-*.test.js
-*.spec.js
-
-# CI/CD
-.github/
-.gitlab-ci.yml
-.travis.yml
-
-# Cache
 .cache/
-.npm/
-.eslintcache
-
-# Logs
 logs/
 *.log
 
-# Build artifacts
-dist/
-build/
+# Vendored source maps are dev artifacts; ~930KB of dead weight in the image.
+**/*.js.map

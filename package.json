@@ -1,37 +1,34 @@
 {
   "name": "weatherscan",
-  "version": "2.0.0",
-  "description": "Weatherscan IntelliStar Simulator with OpenWeatherMap and RainViewer APIs",
+  "version": "3.0.0",
+  "description": "Weatherscan IntelliStar simulator with a key-free backend, Home Assistant support, and the original frontend intact",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "cors": "node ./webroot/js/cors.js",
-    "http-server": "http-server ./webroot -p 8080",
-    "dev-server": "live-server ./webroot --port=8080",
-    "inject-env": "node scripts/inject-env.js",
-    "prestart": "npm run inject-env",
-    "start": "npm-run-all --parallel cors http-server",
-    "dev": "npm-run-all --parallel cors dev-server",
+    "start": "node server/index.js",
+    "dev": "LOG_REQUESTS=true NODE_ENV=development node --watch server/index.js",
+    "test": "node --test \"test/*.test.js\"",
+    "check": "node scripts/check-config.js",
     "docker:build": "docker build -t weatherscan:latest .",
-    "docker:run": "docker run -p 8080:8080 -p 8081:8081 --env-file .env weatherscan:latest",
-    "docker:compose": "docker-compose up",
-    "docker:compose:build": "docker-compose up --build",
-    "docker:stop": "docker-compose down"
+    "docker:run": "docker run --rm -p 8080:8080 --env-file .env weatherscan:latest",
+    "docker:up": "docker compose up -d",
+    "docker:logs": "docker compose logs -f",
+    "docker:down": "docker compose down"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Jessecar96/Weatherscan.git"
+    "url": "git+https://github.com/negative-video/Weatherscan.git"
   },
-  "dependencies": {
-    "cors-anywhere": "^0.4.4",
-    "date-fns": "^2.23.0",
-    "http-server": "^14.1.0",
-    "live-server": "^1.1.0",
-    "npm-run-all": "^4.1.5"
-  },
-  "devDependencies": {
-    "gulp": "^4.0.2",
-    "gulp-autoprefixer": "^6.1.0",
-    "gulp-clean-css": "^4.2.0",
-    "gulp-sass": "^5.0.0",
-    "gulp-sourcemaps": "^2.6.5"
-  }
+  "keywords": [
+    "weather",
+    "weatherscan",
+    "intellistar",
+    "home-assistant",
+    "open-meteo"
+  ],
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
 }

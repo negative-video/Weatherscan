@@ -1,68 +1,34 @@
-# Multi-stage Dockerfile for Weatherscan IntelliStar Simulator
-# Optimized for production use with best practices
+# Weatherscan IntelliStar Simulator
+#
+# Single stage, no build step, no npm install: the server has zero runtime
+# dependencies. That keeps the image small and the advisory surface empty.
 
-# Stage 1: Base image with Node.js
-FROM node:18-alpine AS base
+FROM node:22-alpine
 
-# Install dependencies for better reliability
-RUN apk add --no-cache \
-    dumb-init \
-    tini
+RUN apk add --no-cache tini wget
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Non-root from the start.
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S weatherscan -u 1001 -G nodejs
 
-# Stage 2: Dependencies
-FROM base AS dependencies
+COPY --chown=weatherscan:nodejs package.json ./
+COPY --chown=weatherscan:nodejs server ./server
+COPY --chown=weatherscan:nodejs webroot ./webroot
 
-# Install production dependencies
-RUN npm ci --only=production && \
-    npm cache clean --force
-
-# Stage 3: Development dependencies (for building if needed)
-FROM base AS dev-dependencies
-
-# Install all dependencies including devDependencies
-RUN npm ci && \
-    npm cache clean --force
-
-# Stage 4: Production image
-FROM base AS production
-
-# Set environment variables
 ENV NODE_ENV=production \
     PORT=8080 \
-    CORS_PORT=8081
+    HOST=0.0.0.0
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S weatherscan -u 1001
+EXPOSE 8080
 
-# Copy production dependencies from dependencies stage
-COPY --from=dependencies --chown=weatherscan:nodejs /app/node_modules ./node_modules
-
-# Copy application files
-COPY --chown=weatherscan:nodejs . .
-
-# Create directory for config if it doesn't exist
-RUN mkdir -p /app/config && \
-    chown -R weatherscan:nodejs /app
-
-# Expose ports
-EXPOSE 8080 8081
-
-# Use tini as init system (handles signals properly)
-ENTRYPOINT ["/sbin/tini", "--"]
-
-# Switch to non-root user
 USER weatherscan
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:8080/', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+# tini reaps zombies and forwards signals, so `docker stop` exits cleanly.
+ENTRYPOINT ["/sbin/tini", "--"]
 
-# Start the application
-CMD ["npm", "start"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget --quiet --tries=1 --spider http://127.0.0.1:8080/api/healthz || exit 1
+
+CMD ["node", "server/index.js"]
