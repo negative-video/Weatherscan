@@ -7,7 +7,8 @@ ehthumbs_vista.db
 
 #secrets
 secrets.js
-test/
+# 'test/' was ignored upstream as a scratch directory; this fork keeps a real
+# test suite there, so only the upstream scratch paths stay ignored.
 lamberttest3/
 
 # Dump file
