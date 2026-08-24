@@ -1825,11 +1825,9 @@ var mainMap
 			for (var i = 0; i < $prevCities.length; i++) {
 				left += -1.06*($($prevCities[i]).outerWidth(true) + $(header + ' .divider-arrow').first().outerWidth(true));
 			}
-			$scroller.animate({ 'left':	left+'px' }, 900,
-			function(){
-				// on completion, move the old one to the end
+			// on completion, move the old one to the end
+			var settle = function(){
 				$scroller.css('left','');
-				console.log($cities)
 				for (var i = 0; i < $prevCities.length; i++) {
 					if ($prevCities[i].dataset.repeat == true || $prevCities[i].dataset.repeat == 'true') {
 						$(header + ' .hscroller').append('<span class="divider-arrow" style="font-family: Zemestro Std ">&lt;</span>')
@@ -1843,7 +1841,35 @@ var mainMap
 					}
 					$(header + ' .divider-arrow').first().remove();
 				}
-			})
+			};
+
+			// Animating `left` made jQuery relayout the whole header strip on
+			// every frame of a 900ms tween, which is why the slide-name scroll
+			// was the choppiest transition in the loop. A transform animation is
+			// handled by the compositor and never touches layout. `composite:
+			// 'add'` matters: .hscroller already carries a scale() and a
+			// translateY() from the stylesheet, and a plain transform animation
+			// would replace them rather than build on top.
+			var scroller = $scroller[0];
+			if (scroller && typeof scroller.animate === 'function' && window.DOMMatrixReadOnly) {
+				// `left` is a layout offset, so the element's own scale() does not
+				// apply to it. An added transform lands inside that scale and does,
+				// which would overshoot by 6%. Divide it back out. Measured: a
+				// -200px `left` moves the strip 133.33px, and so does this.
+				var scaleX = new DOMMatrixReadOnly(getComputedStyle(scroller).transform).a || 1;
+				var slide = scroller.animate(
+					[{ transform: 'translateX(0px)' }, { transform: 'translateX(' + (left / scaleX) + 'px)' }],
+					{ duration: 900, easing: 'ease-in-out', fill: 'forwards', composite: 'add' }
+				);
+				slide.onfinish = function () {
+					settle();
+					// Drop the held offset only once the reorder has run, so the
+					// strip never flashes back to its old position for a frame.
+					slide.cancel();
+				};
+			} else {
+				$scroller.animate({ 'left': left + 'px' }, 900, settle);
+			}
 
 		}
 
