@@ -126,6 +126,47 @@ let pointsOnMapCircle = function(latitude, longitude, distance, numPoints) {
 }
 
 
+/**
+ * Grow a bar from nothing to its final size.
+ *
+ * These were all `$el.animate({height: ...}, 1500)`. Height is a layout
+ * property, so the browser ran style, layout and paint on every frame of a
+ * 1.5 second tween — four bars at a time on the daypart slides. That is enough
+ * main-thread work to visibly chop the lower ticker, which is otherwise a
+ * compositor-driven CSS animation and should be immune to anything the page is
+ * doing.
+ *
+ * The bar is given its final height up front and scaled up from zero instead,
+ * which the compositor handles on its own thread. The end state is identical,
+ * and the labels inside every one of these bars are opacity:0 until the growth
+ * finishes, so there is nothing visible to distort on the way up. The gradients
+ * either run along the axis being scaled — a linear ramp scaled along its own
+ * axis is the same ramp — or straight across it.
+ *
+ * `done` is called with `this` bound to the element, the way jQuery's complete
+ * callback did.
+ */
+function growBar(target, finalHeight, duration, done) {
+	var $el = $(target);
+	if (!$el.length) { if (done) done(); return; }
+	var el = $el[0];
+
+	if (typeof el.animate !== 'function') {
+		// No Web Animations API: behave exactly as before.
+		$el.css('height', 0).animate({ height: finalHeight }, duration, done);
+		return;
+	}
+
+	$el.css({ height: finalHeight, 'transform-origin': 'bottom' });
+	var grow = el.animate(
+		[{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }],
+		// `backwards` so the bar is already flat on the frame before it starts,
+		// rather than flashing at full height for one frame.
+		{ duration: duration, easing: 'ease-in-out', fill: 'backwards' }
+	);
+	grow.onfinish = function () { if (done) done.call(el); };
+}
+
 // maps current condition code to icon
 function getCCicon(imgDiv,ccCode, windData){
 	var icon = {"0":19,"1":19,"2":19,"3":19,"4":19,"5":28,"6":30,"7":29,"8":32,"9":12,"10":33,"11":12,"12":12,"13":23,"14":24,"15":37,"16":24,"17":31,"18":31,"19":11,"20":10,"21":11,"22":11,"23":9,"24":9,"25":35,"26":0,"27":5,"28":1,"29":6,"30":2,"31":8,"32":4,"33":7,"34":3,"35":30,"36":4,"37":20,"38":20,"39":15,"40":14,"41":26,"42":25,"43":37,"44":38,"45":16,"46":27,"47":21}[ccCode]

@@ -284,7 +284,7 @@ function Loops() {
 					$('.forecast-tile').each(function(){
 						temp = $(this).find('.high').first().text();
 						value = ((temp-min)/range) * prange + 78;  // find percentage of range and translate to percent and add that to the starting css % height number
-						$(this).find('.hourly-high').animate({height:value+"%"}, 1500,function(){
+						growBar($(this).find('.hourly-high'), value+"%", 1500, function(){
 							$(this).find('.high').fadeTo('slow', 1);
 						});
 					})

@@ -544,7 +544,7 @@ var mainMap
 					temp = weatherInfo.dayPart.weatherLocs[location].hour[i].temp
 					value = ((temp-min)/range) * prange + 78; // find percentage of range and translate to percent and add that to the starting css % height number
 					valueii = (value/100) * 165 // multiply percentage by max height
-					$('.info-slide-content.daypart .hour.' + hourlable[i] + ' .tempbar').animate({height:valueii+"px"}, 1500,function(){
+					growBar('.info-slide-content.daypart .hour.' + hourlable[i] + ' .tempbar', valueii+"px", 1500, function(){
 						$('.info-slide-content.daypart .hour .tempbar .temp').fadeTo('slow', 1);
 						$('.info-slide-content.daypart .hour .tempbar .wind').fadeTo('slow', 1);
 					});
@@ -798,7 +798,15 @@ var mainMap
 				} else {
 					var alength = {"0":"-10", "1":"22", "2":"55", "3":"88", "4":"121", "5":"154", "6":"187", "7":"220", "8":"253", "9":"286", "10":"300"}[weatherInfo.healthAcheBreath.achesindex]
 					var atime = {"0":0, "1":250, "2":500, "3":750, "4":1000, "5":1250, "6":1500, "7":1750, "8":2000, "9":2250, "10":2500}[weatherInfo.healthAcheBreath.achesindex]
-					var blength = {"10":"-10", "9":"22", "8":"55", "7":"88", "6":"121", "5":"154", "5":"187", "4":"220", "3":"253", "2":"286", "1":"300"}[weatherInfo.healthAcheBreath.breathindex]
+					// The mirror of alength: breathing counts up towards the good
+					// end, so 10 sits at the left. Two things were wrong with the
+					// original table. It declared "5" twice — "154" then "187" —
+					// so the later one won, 154 was unreachable, and every index
+					// from 5 down landed one stop too far along the bar. And it
+					// had no "0" while btime does, which left the two tables off
+					// by one so the arrow travelled at a different speed from the
+					// aches arrow beside it.
+					var blength = {"10":"-10", "9":"22", "8":"55", "7":"88", "6":"121", "5":"154", "4":"187", "3":"220", "2":"253", "1":"286", "0":"300"}[weatherInfo.healthAcheBreath.breathindex]
 					var btime = {"10":0, "9":250, "8":500, "7":750, "6":1000, "5":1250, "4":1500, "3":1750, "2":2000, "1":2250, "0":2500}[weatherInfo.healthAcheBreath.breathindex]
 					$('.info-slide-content.Aches-Breath .thing .thingtext').text(weatherInfo.healthAcheBreath.date)
 					//reset bars
@@ -1391,7 +1399,7 @@ var mainMap
 						temp = weatherInfo.dayPart.weatherLocs[location].hour[i].temp
 						value = ((temp-min)/range) * prange + 78; // find percentage of range and translate to percent and add that to the starting css % height number
 						valueii = (value/100) * 165 // multiply percentage by max height
-						$('.info-slide-content.severe-daypart .hour.' + hourlable[i] + ' .tempbar').animate({height:valueii+"px"}, 1500,function(){
+						growBar('.info-slide-content.severe-daypart .hour.' + hourlable[i] + ' .tempbar', valueii+"px", 1500, function(){
 							$('.info-slide-content.severe-daypart .hour .tempbar .temp').fadeTo('slow', 1);
 							$('.info-slide-content.severe-daypart .hour .tempbar .wind').fadeTo('slow', 1);
 						});
