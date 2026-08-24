@@ -6,7 +6,7 @@ weather API key.
 
 ![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)
 ![Runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-blue.svg)
-![Tests](https://img.shields.io/badge/tests-69-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-73-brightgreen.svg)
 ![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
@@ -133,6 +133,7 @@ shows up — as slides that feel heavy and transitions that judder.
 | Vendor JS, repeat request | 34 ms of CPU, every time | 48 ms once, then 1.5 ms |
 | Vendor JS caching | revalidated on every page load | cached for a week |
 | Slide-header transition | jQuery tween of `left` — full relayout per frame | compositor-only transform |
+| Temperature-bar growth | jQuery tween of `height` — full relayout per frame, 4 bars at once | compositor-only transform |
 
 **The icon sprite sheets are animated PNGs.** `images/icons2010sprite.png` and
 its 2007 counterpart are 4864x125 APNGs: thirty frames, 33 ms apart, looping
@@ -167,6 +168,15 @@ made jQuery relayout the entire header strip on every frame of a 900 ms tween,
 which is why that transition was the choppiest thing in the loop. It is now a
 `transform` animation the compositor handles on its own, composited onto the
 stylesheet's existing scale so it lands on exactly the same pixel as before.
+
+**The temperature bars relaid out the page sixty times a second.** Every bar
+that grows — the daypart slides, the lower bar's hourly tiles — was a jQuery
+tween of `height`, four at a time for a second and a half. That is enough
+main-thread work to visibly chop the lower ticker, which is a compositor-driven
+CSS animation and should be immune to whatever else the page is doing. They now
+get their final height up front and scale up from zero, which the compositor
+handles on its own. The labels inside are `opacity: 0` until the growth
+finishes, so there is nothing visible to distort on the way up.
 
 **Static assets are compressed once.** Every request used to re-run gzip over
 the file — 34 ms of CPU for `mapbox-gl.js` alone, on a container capped at a
@@ -368,7 +378,7 @@ every shape inspectable with `curl`.
 
 ```bash
 npm run dev      # auto-restart, request logging
-npm test         # 69 tests, no dependencies
+npm test         # 73 tests, no dependencies
 npm run check    # probe every configured data source
 npm run split-icons  # cut the animated icon sheets into per-icon files
 ```
