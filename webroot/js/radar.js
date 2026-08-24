@@ -621,6 +621,36 @@ function loadRadarImages(divID) {
     .catch(console.error);
 		}
 }
+/**
+ * Show one frame of a radar loop.
+ *
+ * Both loops used to walk the whole timestamp list on every 100ms tick and set
+ * `visibility` on all thirteen frames of both maps — twenty-six calls to change
+ * two layers. mapbox-gl and maplibre-gl short-circuit a write that matches the
+ * current value, so the redundant twenty-four were not repaints, but they were
+ * still twenty-four layer lookups and deep-equals per tick per loop, ten times a
+ * second, for as long as the page is open.
+ *
+ * `prev < 0` means the caller wants the whole list reset, which is what the
+ * first tick of a loop needs: layers are added visible, so everything except
+ * frame zero has to be hidden once before stepping.
+ */
+function showRadarFrame(maps, timestamps, prefix, index, prev) {
+	maps.forEach(function (m) {
+		if (!m) return;
+		if (prev < 0) {
+			timestamps.forEach(function (timestamp, i) {
+				m.setLayoutProperty(`${prefix}${timestamp.ts}`, 'visibility', i === index ? 'visible' : 'none');
+			});
+		} else {
+			if (prev !== index && timestamps[prev]) {
+				m.setLayoutProperty(`${prefix}${timestamps[prev].ts}`, 'visibility', 'none');
+			}
+			m.setLayoutProperty(`${prefix}${timestamps[index].ts}`, 'visibility', 'visible');
+		}
+	});
+}
+
 function animateRadar(divID, loopnum, maxloop) {
 	var mapdiv;
 	var radardiv;
@@ -643,9 +673,15 @@ function animateRadar(divID, loopnum, maxloop) {
 		console.warn(`[radar] no frames for ${divID} yet; skipping animation`);
 		return;
 	}
-  interval = setInterval(() => {
+	// Both of these guards matter on a display that stays up for weeks. Starting
+	// a loop while one is already running used to leave the old interval ticking
+	// forever, because the tick cleared the shared `interval` global — by then
+	// the newer handle — instead of its own. Every stacked loop is another 10Hz
+	// timer driving two WebGL maps that nobody ever stops.
+	if (interval) clearInterval(interval);
+	const handle = interval = setInterval(() => {
     if (i > sortedmaptimestamps.length - 1) {
-      clearInterval(interval);
+      clearInterval(handle);
 			setTimeout(function() {
 				if (divID == 'minimap') {
 					animateRadar('minimap')
@@ -657,20 +693,11 @@ function animateRadar(divID, loopnum, maxloop) {
 				return;
 			},500)
     } else {
-		sortedmaptimestamps.forEach((timestamp, index) => {
-	    radardiv.setLayoutProperty(
-	        (divID == 'satrad-1') ? `satradlayer_${timestamp.ts}` : `radarlayer_${timestamp.ts}`,
-	        "visibility",
-	      		index === i ? "visible" : "none"
-	     );
-			 if (divID != 'satrad-1') {
-			 	mapdiv.setLayoutProperty(
- 	        `radarlayer_${timestamp.ts}`,
- 	        "visibility",
- 	      		index === i ? "visible" : "none"
- 	     		);
-	    	}
-			});
+			var prefix = (divID == 'satrad-1') ? 'satradlayer_' : 'radarlayer_';
+			showRadarFrame([radardiv], sortedmaptimestamps, prefix, i, i - 1);
+			if (divID != 'satrad-1') {
+				showRadarFrame([mapdiv], sortedmaptimestamps, 'radarlayer_', i, i - 1);
+			}
       i += 1;
     }
   }, 100);
@@ -682,26 +709,18 @@ function animateMiniRadar() {
 		console.warn('[radar] no minimap frames yet; skipping animation');
 		return;
 	}
-  miniinterval = setInterval(() => {
+	// See animateRadar: the minimap loop restarts itself forever, so a stacked
+	// interval here never goes away on its own.
+	if (miniinterval) clearInterval(miniinterval);
+	const handle = miniinterval = setInterval(() => {
     if (i > sortedtimestampsmini.length - 1) {
-      clearInterval(miniinterval);
+      clearInterval(handle);
 			setTimeout(function() {
 				animateMiniRadar()
 				return;
 			},500)
     } else {
-		sortedtimestampsmini.forEach((timestamp, index) => {
-	    miniradar.setLayoutProperty(
-					`radarlayer_${timestamp.ts}`,
-	        "visibility",
-	      		index === i ? "visible" : "none"
-	     );
-		 	minimap.setLayoutProperty(
-	        `radarlayer_${timestamp.ts}`,
-	        "visibility",
-	      		index === i ? "visible" : "none"
-     		);
-			});
+			showRadarFrame([miniradar, minimap], sortedtimestampsmini, 'radarlayer_', i, i - 1);
       i += 1;
     }
   }, 100);
