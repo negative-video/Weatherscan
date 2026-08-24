@@ -19,6 +19,17 @@ var rainViewerConfig = {
   cachedSeries: null,
   cacheTime: 0,
   cacheTTL: 5 * 60 * 1000,
+
+  // Highest zoom each upstream actually serves. Past these they return a
+  // "Zoom Level Not Supported" placeholder image rather than a 404, so the
+  // failure shows up as black boxes painted over the map instead of a missing
+  // tile. Declaring them on the *source* makes mapbox-gl over-zoom the last
+  // real level instead of asking for one that does not exist.
+  // These are fallbacks; fetchSeries() replaces them with the values the
+  // backend reports for the layers actually in use.
+  radarMaxZoom: 7,      // RainViewer tilecache
+  satelliteMaxZoom: 7,  // NASA GIBS GoogleMapsCompatible_Level7
+
   radarUrlByTs: {},
   satelliteUrlByTs: {},
   // Used before any series has loaded, so the map never requests a bad tile.
@@ -36,6 +47,17 @@ var rainViewerConfig = {
     (data.radar.frames || []).forEach((f) => { this.radarUrlByTs[f.ts] = f.url; });
     this.satelliteUrlByTs = {};
     (data.satellite.frames || []).forEach((f) => { this.satelliteUrlByTs[f.ts] = f.url; });
+
+    // The backend knows each upstream's real ceiling — GIBS GeoColor tops out
+    // at zoom 7, its clean-IR layer at 6 — so prefer what it reports over the
+    // constants above. Switching satellite layers then cannot silently
+    // reintroduce the placeholder tiles.
+    if (data.radar && typeof data.radar.maxZoom === 'number') {
+      this.radarMaxZoom = data.radar.maxZoom;
+    }
+    if (data.satellite && typeof data.satellite.maxZoom === 'number') {
+      this.satelliteMaxZoom = data.satellite.maxZoom;
+    }
 
     this.cachedSeries = data;
     this.cacheTime = Date.now();
@@ -542,7 +564,8 @@ function loadRadarImages(divID) {
 	            tiles: [
 								rainViewerConfig.getSatelliteTileUrl(timestamp.ts)
 	            ],
-	            tileSize: 256
+	            tileSize: 256,
+	            maxzoom: rainViewerConfig.satelliteMaxZoom
 	          },
 	          layout: { visibility: "visible" },
 						paint: {'raster-fade-duration': .5, 'raster-opacity':0,'raster-brightness-max':1},
@@ -569,7 +592,8 @@ function loadRadarImages(divID) {
             tiles: [
 							rainViewerConfig.getRadarTileUrl(timestamp.ts)
             ],
-            tileSize: 256
+            tileSize: 256,
+            maxzoom: rainViewerConfig.radarMaxZoom
           },
           layout: { visibility: "visible" },
 					paint: {'raster-fade-duration': .5, 'raster-opacity':0,'raster-brightness-max':0.9},
@@ -584,7 +608,8 @@ function loadRadarImages(divID) {
             tiles: [
 							rainViewerConfig.getRadarTileUrl(timestamp.ts)
             ],
-            tileSize: 256
+            tileSize: 256,
+            maxzoom: rainViewerConfig.radarMaxZoom
           },
           layout: { visibility: "visible" },
 					paint: {'raster-fade-duration': .5,'raster-opacity':0,'raster-brightness-max':0.9},
@@ -610,6 +635,14 @@ function animateRadar(divID, loopnum, maxloop) {
 		sortedmaptimestamps = satradsortedtimestamps;
 	}
 	let i = 0;
+	// No series yet means the radar fetch has not landed or it failed. Without
+	// this the interval below throws on its very first tick — before reaching
+	// its own clearInterval — so it never stops and spins at 10Hz for the life
+	// of the page.
+	if (!sortedmaptimestamps || !sortedmaptimestamps.length) {
+		console.warn(`[radar] no frames for ${divID} yet; skipping animation`);
+		return;
+	}
   interval = setInterval(() => {
     if (i > sortedmaptimestamps.length - 1) {
       clearInterval(interval);
@@ -644,6 +677,11 @@ function animateRadar(divID, loopnum, maxloop) {
 }
 function animateMiniRadar() {
 	let i = 0;
+	// Same guard as animateRadar: an unset series would throw every tick.
+	if (!sortedtimestampsmini || !sortedtimestampsmini.length) {
+		console.warn('[radar] no minimap frames yet; skipping animation');
+		return;
+	}
   miniinterval = setInterval(() => {
     if (i > sortedtimestampsmini.length - 1) {
       clearInterval(miniinterval);

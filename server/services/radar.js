@@ -8,6 +8,18 @@ const RAINVIEWER_API = 'https://api.rainviewer.com/public/weather-maps.json';
 const GIBS_BASE = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best';
 
 /**
+ * Highest zoom RainViewer's tilecache actually renders.
+ *
+ * Past this it answers 200 with a "Zoom Level Not Supported" placeholder rather
+ * than a 404, so an over-zoomed request paints grey boxes over the map instead
+ * of failing quietly. The client declares this on the tile *source* so
+ * mapbox-gl over-zooms the last real level instead of requesting one that does
+ * not exist. RainViewer does not publish the value, so it is measured: z7 tiles
+ * vary by area, z8 and above are byte-identical placeholders.
+ */
+const RAINVIEWER_MAX_ZOOM = 7;
+
+/**
  * Radar frames from RainViewer.
  *
  * The important detail is that each frame carries its own `path`. Older
@@ -134,6 +146,7 @@ async function series() {
       available: radar.frames.length > 0,
       host: radar.host,
       generated: radar.generated,
+      maxZoom: RAINVIEWER_MAX_ZOOM,
       frames: radar.frames.map((f) => ({
         ts: f.time,
         forecast: !!f.forecast,
@@ -143,7 +156,9 @@ async function series() {
     satellite: {
       available: satellite.frames.length > 0,
       layer: satellite.layer,
-      maxZoom: spec.maxZoom,
+      // Report the ceiling of the layer actually fetched rather than a
+      // second lookup that can drift from it.
+      maxZoom: satellite.maxZoom != null ? satellite.maxZoom : spec.maxZoom,
       frames: satellite.frames.map((f) => ({
         ts: f.time,
         url: satelliteTileTemplate(spec, f.iso),

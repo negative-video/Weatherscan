@@ -1633,8 +1633,22 @@ var mainMap
 				}
 				keysNext = JSON.parse(divTestNext.dataset.slideorder)
 			}
-			testFunc = new Function(keysNext[preloadIdx].testDisplay)
-			if (testFunc()) {
+			// testDisplay strings come from config.js with replaceLocIdx substituted
+			// textually, so an index with no matching weatherInfo entry evaluates to
+			// something like weatherLocs[undefined].enabled and throws. That used to
+			// propagate out of showSlides and stop the loop permanently. Treat a
+			// throwing test as "skip this slide", which is what the expressions
+			// return when their data is missing anyway.
+			var testResult
+			try {
+				testFunc = new Function(keysNext[preloadIdx].testDisplay)
+				testResult = testFunc()
+			} catch (err) {
+				console.warn('[slides] testDisplay for ' + keysNext[preloadIdx].name +
+					' failed, skipping slide: ' + err.message)
+				testResult = true
+			}
+			if (testResult) {
 				if (!keysNext[preloadIdx].alternate) {
 					keysNext[preloadIdx].skipped = true
 					divTestNext.dataset.slideorder = JSON.stringify(keysNext)
@@ -1665,11 +1679,22 @@ var mainMap
 			$('.slideLoaded').removeClass("slideLoaded")
 			$(maindiv[keys[idx].name]).removeClass("preload")
 			$(maindiv[keys[idx].name]).addClass("slideLoaded")
+			$(maindiv[keys[idx].name]).css('opacity', 1)
 		} else {
 			//if slide was not preloaded, load
 			if (!$(maindiv[keys[idx].name])[0].classList.contains('slideLoaded')) {
+				// Hide whatever container is on screen first. The preload branch above
+				// does this via $('.slideLoaded').fadeOut(0); this path did not, so
+				// moving to a container that was not preloaded left the previous one
+				// visible underneath — its content faded out, but its always-visible
+				// subheader still painted over the new slide.
+				//
+				// The .css('opacity', 1) matters too: a container that was preloaded
+				// earlier is left at opacity 0, so without this it would stay invisible
+				// when reached through this path.
+				$('.slideLoaded').not(maindiv[keys[idx].name]).fadeOut(0).removeClass('slideLoaded');
 				$(maindiv[keys[idx].name]).addClass("slideLoaded")
-				$(maindiv[keys[idx].name]).fadeIn(0)
+				$(maindiv[keys[idx].name]).fadeIn(0).css('opacity', 1)
 			}
 			if (mainDivHeaders[keys[idx].name] != '') $(maindiv[keys[idx].name] + ' .subhead-title').text(mainDivHeaders[keys[idx].name].replace('*daytitle*',weatherInfo.dayPart.weatherLocs[location].daytitle).replace('*none*',''));
 			if (mainDivCityHeaders[keys[idx].name] != '') $(maindiv[keys[idx].name] + ' .subhead-city').text(mainDivCityHeaders[keys[idx].name].replace('*currentConditionsLocation*',weatherInfo.currentCond.weatherLocs[location].displayname).replace('*dayPartLocation*',weatherInfo.dayPart.weatherLocs[location].displayname).replace('*dayDescLocation*',weatherInfo.dayDesc.weatherLocs[location].displayname).replace('*extendedForecastLocation*',weatherInfo.fiveDay.weatherLocs[location].displayname).replace('*almanacLocation*',weatherInfo.almanac.displayname).replace('*none*','').replace('*currentConditionsEnding*',slideApperanceSettings.currentConditions.cityHeaderEnding).replace('*dayPartEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*dayDescEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*extendedForecastEnding*',slideApperanceSettings.extendedForecast.cityHeaderEnding).replace('*almanacEnding*',slideApperanceSettings.almanac.cityHeaderEnding).replace('*healthlocation*',weatherInfo.healthforecast.displayname));
@@ -1679,7 +1704,18 @@ var mainMap
 			if (mainDivHeaders[keysNext[preloadIdx].name] != '') $(maindiv[keysNext[preloadIdx].name] + ' .subhead-title').text(mainDivHeaders[keysNext[preloadIdx].name].replace('*daytitle*',weatherInfo.dayPart.weatherLocs[location].daytitle).replace('*none*',''));
 			if (mainDivCityHeaders[keysNext[preloadIdx].name] != '') $(maindiv[keysNext[preloadIdx].name] + ' .subhead-city').text(mainDivCityHeaders[keysNext[preloadIdx].name].replace('*currentConditionsLocation*',weatherInfo.currentCond.weatherLocs[location].displayname).replace('*dayPartLocation*',weatherInfo.dayPart.weatherLocs[location].displayname).replace('*dayDescLocation*',weatherInfo.dayDesc.weatherLocs[location].displayname).replace('*extendedForecastLocation*',weatherInfo.fiveDay.weatherLocs[location].displayname).replace('*almanacLocation*',weatherInfo.almanac.displayname).replace('*none*','').replace('*currentConditionsEnding*',slideApperanceSettings.currentConditions.cityHeaderEnding).replace('*dayPartEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*dayDescEnding*',slideApperanceSettings.dayPart.cityHeaderEnding).replace('*extendedForecastEnding*',slideApperanceSettings.extendedForecast.cityHeaderEnding).replace('*almanacEnding*',slideApperanceSettings.almanac.cityHeaderEnding).replace('*healthlocation*',weatherInfo.healthforecast.displayname));
 			$(maindiv[keysNext[preloadIdx].name]).addClass("preload")
-			$(maindiv[keysNext[preloadIdx].name]).fadeIn(0)
+			// Preloading exists so the next slide's maps have layout and can render
+			// before they are shown. It used to fade the container fully in while the
+			// current slide was still up, and a container's .info-subheader is
+			// always-visible markup — so the incoming slide's header painted over the
+			// outgoing one. opacity keeps the layout the maps need without drawing it.
+			//
+			// .show() rather than .fadeIn(0): fadeIn queues an fx animation even at
+			// zero duration, so a .css('opacity', 0) chained onto it is applied
+			// immediately and then overwritten when that queued animation completes
+			// and sets opacity back to 1. .show() is synchronous and leaves nothing
+			// queued to undo the change.
+			$(maindiv[keysNext[preloadIdx].name]).stop(true, false).show().css('opacity', 0)
 		}
 		//If alternative slide was used, reset it.
 		if (keys[idx].originalSlide) {
