@@ -188,3 +188,60 @@ test('parseFeed strips error items but keeps the rest of the feed', () => {
   assert.strictEqual(feed.items.length, 1);
   assert.strictEqual(feed.items[0].title, 'Council approves new park');
 });
+
+// --- source labels --------------------------------------------------------
+
+test('sourceLabel drops the boilerplate publishers append to feed titles', () => {
+  const cases = {
+    'Ars Technica - All Content': 'Ars Technica',
+    'Ars Technica — All content': 'Ars Technica',
+    'NYT > Top Stories': 'NYT',
+    'Hacker News: Front Page': 'Hacker News',
+    'The Verge - All Posts - RSS Feed': 'The Verge',
+    'Some Blog | Latest Headlines': 'Some Blog',
+    'Example.com / Everything': 'Example.com',
+  };
+  for (const [input, want] of Object.entries(cases)) {
+    assert.strictEqual(feeds.sourceLabel(input), want, `for ${input}`);
+  }
+});
+
+test('sourceLabel keeps a section that actually means something', () => {
+  for (const title of ['BBC News - World', 'NPR: Science', 'Reuters - Markets']) {
+    assert.strictEqual(feeds.sourceLabel(title), title, `mangled ${title}`);
+  }
+});
+
+test('sourceLabel leaves plain publication names alone', () => {
+  for (const title of ['Ars Technica', 'BBC News', 'Hacker News']) {
+    assert.strictEqual(feeds.sourceLabel(title), title, `mangled ${title}`);
+  }
+});
+
+test('sourceLabel does not split hyphenated names', () => {
+  // No whitespace around the hyphen, so it is part of the name, not a separator.
+  assert.strictEqual(feeds.sourceLabel('E-Commerce Times'), 'E-Commerce Times');
+  assert.strictEqual(feeds.sourceLabel('Ars Technica - E-Commerce'), 'Ars Technica - E-Commerce');
+});
+
+test('sourceLabel keeps a title that is nothing but boilerplate', () => {
+  // Better a redundant prefix than an empty one.
+  assert.strictEqual(feeds.sourceLabel('RSS Feed'), 'RSS Feed');
+  assert.strictEqual(feeds.sourceLabel(''), '');
+  assert.strictEqual(feeds.sourceLabel(null), '');
+});
+
+test('the feed title reaching the ticker is already cleaned', () => {
+  const rss = `<rss><channel><title>Ars Technica - All Content</title>
+    <item><title>Headline one</title></item></channel></rss>`;
+  assert.strictEqual(feeds.parseFeed(rss).title, 'Ars Technica');
+});
+
+test('sourceLabel drops a label that is a sentence rather than a name', () => {
+  // The NWS alert feeds title themselves this way. A 53-character prefix in
+  // front of every headline is worse than no prefix.
+  assert.strictEqual(
+    feeds.sourceLabel('Current watches, warnings, and advisories for Virginia'), ''
+  );
+  assert.strictEqual(feeds.sourceLabel('Ars Technica'), 'Ars Technica');
+});

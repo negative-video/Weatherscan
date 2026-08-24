@@ -204,6 +204,63 @@ function parseJSONFeed(text) {
   }));
 }
 
+/**
+ * Boilerplate that publishers append to a feed's own title. None of it says
+ * anything about who wrote the headline, which is the only job the ticker's
+ * source prefix has.
+ */
+const FEED_TITLE_NOISE = new Set([
+  'all content', 'all posts', 'all stories', 'all articles', 'everything',
+  'full feed', 'full text', 'main feed', 'news feed', 'the feed', 'feed',
+  'rss feed', 'rss', 'atom feed', 'atom', 'xml feed',
+  'latest', 'latest headlines', 'latest news', 'latest stories',
+  'latest articles', 'latest posts', 'recent posts', 'recent articles',
+  'headlines', 'top stories', 'top news', 'front page', 'home page', 'home',
+  'articles', 'posts', 'stories', 'blog', 'news', 'updates',
+]);
+
+// Dashes and slashes only separate when there is space on the left, or the
+// title comes apart on hyphenated names and URLs. A colon is the other way
+// round — it binds to the word before it ("Hacker News: Front Page") but needs
+// a space after, so clock times stay intact.
+// Longer than this and it is prose, not a publication's name.
+const MAX_SOURCE_LABEL = 32;
+
+const TITLE_TAIL = /^(.*\S)(?:\s+[-–—|»>/]+\s*|\s*:\s+)([^-–—|:»>/]+?)\s*$/;
+
+/**
+ * Trim a feed title down to something worth putting in front of a headline.
+ *
+ * Feed titles are rarely just the publication's name — Ars Technica's is
+ * literally "Ars Technica - All Content", so every item in the ticker read
+ * "Ars Technica - All Content: <headline>".
+ *
+ * A trailing segment is dropped only when it is boilerplate, so a section that
+ * actually means something survives: "Ars Technica - All Content" becomes
+ * "Ars Technica", while "BBC News - World" is left exactly as it is.
+ */
+function sourceLabel(title) {
+  const original = String(title || '').replace(/\s+/g, ' ').trim();
+  let out = original;
+
+  // Some titles carry more than one tail: "... - All Content - RSS Feed".
+  for (let i = 0; i < 3; i++) {
+    const m = TITLE_TAIL.exec(out);
+    if (!m || !FEED_TITLE_NOISE.has(m[2].toLowerCase())) break;
+    out = m[1];
+  }
+
+  // A title that was nothing but boilerplate is better left as it was than
+  // dropped to an empty prefix.
+  out = out.replace(/[\s\-–—|:»>/]+$/, '').trim() || original;
+
+  // A masthead is short. Anything longer is a sentence rather than a name —
+  // the NWS alert feeds title themselves "Current watches, warnings, and
+  // advisories for Virginia" — and repeating that in front of every headline
+  // is worse than having no label at all.
+  return out.length <= MAX_SOURCE_LABEL ? out : '';
+}
+
 /** Feed title, used to label items by source. */
 function feedTitle(text, isJSON) {
   if (isJSON) {
@@ -238,7 +295,7 @@ function parseFeed(text) {
   if (errors) {
     console.warn(`[marquee] dropped ${errors} error item(s) reported by the feed itself`);
   }
-  return { title: feedTitle(trimmed, isJSON), items: usable };
+  return { title: sourceLabel(feedTitle(trimmed, isJSON)), items: usable };
 }
 
 // --- public ---------------------------------------------------------------
@@ -301,5 +358,5 @@ function staticItems() {
 
 module.exports = {
   marqueeItems, parseFeed, toPlainText, decodeEntities,
-  parseRSS, parseAtom, parseJSONFeed, looksLikeFeedError,
+  parseRSS, parseAtom, parseJSONFeed, looksLikeFeedError, sourceLabel,
 };

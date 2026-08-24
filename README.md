@@ -6,7 +6,7 @@ weather API key.
 
 ![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)
 ![Runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-blue.svg)
-![Tests](https://img.shields.io/badge/tests-73-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-80-brightgreen.svg)
 ![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
@@ -271,6 +271,15 @@ merged across feeds, de-duplicated, sorted newest-first, and stripped of markup
 before they reach the page. A self-hosted [RSS-Bridge](https://rss-bridge.org/)
 works well — its `format=Json` output is the least fragile to parse.
 
+`MARQUEE_SHOW_SOURCE` prefixes each headline with its feed's name, and that
+name is tidied first. Publishers rarely title a feed with just their masthead —
+Ars Technica's is literally "Ars Technica - All Content" — so a trailing segment
+is dropped when it is boilerplate ("All Content", "Top Stories", "RSS Feed" and
+friends) and kept when it means something: "BBC News - World" survives intact.
+A title too long to be a name at all, like the NWS alert feeds' "Current
+watches, warnings, and advisories for Virginia", is dropped rather than repeated
+in front of every item. Set `MARQUEE_SHOW_SOURCE=false` for no prefix at all.
+
 Only feeds named in `MARQUEE_FEEDS` are ever fetched; there is deliberately no
 `?url=` parameter, so this cannot be used to proxy arbitrary hosts.
 
@@ -378,7 +387,7 @@ every shape inspectable with `curl`.
 
 ```bash
 npm run dev      # auto-restart, request logging
-npm test         # 73 tests, no dependencies
+npm test         # 80 tests, no dependencies
 npm run check    # probe every configured data source
 npm run split-icons  # cut the animated icon sheets into per-icon files
 ```
