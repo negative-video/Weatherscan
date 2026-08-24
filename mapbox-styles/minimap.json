@@ -41,11 +41,6 @@
   "bearing": 0,
   "pitch": 0,
   "sources": {
-    "mapbox://mapbox.terrain-rgb": {
-      "url": "mapbox://mapbox.terrain-rgb",
-      "type": "raster-dem",
-      "tileSize": 256
-    },
     "composite": {
       "url": "mapbox://mapbox.mapbox-streets-v8,mapbox.mapbox-terrain-v2,mapbox.country-boundaries-v1",
       "type": "vector"
@@ -210,34 +205,6 @@
       },
       "source": "composite",
       "source-layer": "landcover",
-      "metadata": {
-        "mapbox:group": "eb0abd8361105c9ae69185b448e9b44f"
-      },
-      "layout": {
-        "visibility": "none"
-      }
-    },
-    {
-      "id": "mapbox-terrain-rgb copy",
-      "type": "hillshade",
-      "paint": {
-        "hillshade-highlight-color": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          0,
-          "hsl(66, 21%, 70%)",
-          22,
-          "#bfc2a2"
-        ],
-        "hillshade-accent-color": "#667b5c",
-        "hillshade-exaggeration": 0.64
-      },
-      "source": "mapbox://mapbox.terrain-rgb",
       "metadata": {
         "mapbox:group": "eb0abd8361105c9ae69185b448e9b44f"
       },

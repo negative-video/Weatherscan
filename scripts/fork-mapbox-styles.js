@@ -131,6 +131,36 @@ function pruneSources(style) {
   return [...new Set(dropped)];
 }
 
+/**
+ * Drop sources that no visible layer reads from.
+ *
+ * The upstream styles carry a raster-dem terrain source feeding a single
+ * hillshade layer that is set to visibility:none — so it never draws, but the
+ * client still fetches its TileJSON on every map init. Mapbox also rewrites
+ * that source on save in a way that makes the request 400. Removing the dead
+ * source and its hidden layer avoids both.
+ */
+function dropUnusedSources(style) {
+  const removed = { sources: [], layers: [] };
+  const visibleUsers = new Set();
+
+  for (const layer of style.layers || []) {
+    const hidden = layer.layout && layer.layout.visibility === 'none';
+    if (!hidden && layer.source) visibleUsers.add(layer.source);
+  }
+
+  for (const [sid, src] of Object.entries(style.sources || {})) {
+    if (visibleUsers.has(sid)) continue;
+    // Keep anything a visible layer might still need at runtime.
+    delete style.sources[sid];
+    removed.sources.push(sid);
+    const before = style.layers.length;
+    style.layers = style.layers.filter((l) => l.source !== sid);
+    removed.layers.push(...Array(before - style.layers.length).fill(sid));
+  }
+  return removed;
+}
+
 /** Repoint layers that read from a private source-layer. */
 function rewriteLayers(style) {
   const changes = [];
@@ -218,6 +248,7 @@ async function main() {
 
     const dropped = pruneSources(style);
     const changes = rewriteLayers(style);
+    const unused = dropUnusedSources(style);
     style.name = spec.name;
     stripServerFields(style);
 
@@ -225,6 +256,9 @@ async function main() {
     fs.writeFileSync(file, JSON.stringify(style, null, 2));
 
     console.log(`${style.layers.length} layers, ${dropped.length} private tileset(s) dropped, ${changes.length} layer(s) repointed`);
+    for (const sid of unused.sources) {
+      console.log(`           removed unused source ${sid} (only hidden layers used it)`);
+    }
     for (const c of changes) console.log(`           ${c}`);
 
     if (update) {

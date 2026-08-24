@@ -300,11 +300,21 @@ tests.
 
 ## Known limitations
 
-- **The Mapbox styles are not ours.** The defaults point at the upstream
-  author's public styles, and those styles reference private tilesets that a
-  third-party token cannot read — so roads, city labels and county lines will be
-  missing. Fork the styles into your own Mapbox account and set
-  `MAPBOX_STYLE_*`.
+- **The default Mapbox styles will not render fully.** They point at the
+  upstream author's styles, which are public to *read* but pull their vector
+  data from that account's private tilesets. Mapbox fails a composite source if
+  any member is inaccessible, so with a third-party token you get roads, city
+  labels and county lines missing entirely. Fix it once with:
+
+  ```bash
+  MAPBOX_WRITE_TOKEN=sk.your_token npm run fork-styles -- --create
+  ```
+
+  That copies the four styles into your account, substitutes the private
+  tilesets for their public Mapbox Streets equivalents, and prints the
+  `MAPBOX_STYLE_*` lines to paste into `.env`. The write token is separate from
+  `MAPBOX_API_KEY` and must never go in `.env` — see
+  [scripts/fork-mapbox-styles.js](scripts/fork-mapbox-styles.js).
 - **Pollen needs a key in the US.** The free CAMS pollen data is Europe-only.
 - **The aches and breathing indices are derived.** They were proprietary Weather
   Channel products with no free equivalent, so they are computed from the
