@@ -15,7 +15,8 @@
     "docker:run": "docker run --rm -p 8080:8080 --env-file .env weatherscan:latest",
     "docker:up": "docker compose up -d",
     "docker:logs": "docker compose logs -f",
-    "docker:down": "docker compose down"
+    "docker:down": "docker compose down",
+    "fork-styles": "node scripts/fork-mapbox-styles.js"
   },
   "repository": {
     "type": "git",

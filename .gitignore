@@ -106,3 +106,6 @@ typings/
 
 .idea
 .DS_Store
+
+# Mapbox write token, used only by scripts/fork-mapbox-styles.js
+.mapbox-write-token

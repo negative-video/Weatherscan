@@ -1,0 +1,110 @@
+{
+  "version": 8,
+  "name": "Weatherscan Basemap",
+  "metadata": {
+    "mapbox:type": "default",
+    "mapbox:origin": "outdoors-v11",
+    "mapbox:sdk-support": {
+      "android": "9.3.0",
+      "ios": "5.10.0",
+      "js": "1.10.0"
+    },
+    "mapbox:autocomposite": true,
+    "mapbox:groups": {}
+  },
+  "center": [
+    -81.792,
+    30.443
+  ],
+  "zoom": 6.76,
+  "bearing": 0,
+  "pitch": 1,
+  "sources": {
+    "mapbox://mapbox.terrain-rgb": {
+      "url": "mapbox://mapbox.terrain-rgb,mapbox.mapbox-streets-v8",
+      "type": "raster-dem",
+      "tileSize": 256
+    },
+    "composite": {
+      "url": "mapbox://mapbox.mapbox-streets-v8,mapbox.country-boundaries-v1",
+      "type": "vector"
+    }
+  },
+  "glyphs": "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "water",
+      "type": "fill",
+      "paint": {
+        "fill-color": "#020969"
+      },
+      "layout": {},
+      "source": "composite",
+      "source-layer": "water"
+    },
+    {
+      "id": "landcover-outdoors copy",
+      "type": "line",
+      "source": "composite",
+      "maxzoom": 12,
+      "layout": {
+        "line-join": "round",
+        "line-round-limit": 1
+      },
+      "source-layer": "country_boundaries",
+      "paint": {
+        "line-color": "#315390",
+        "line-offset": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          0,
+          0,
+          22,
+          0
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          0,
+          20,
+          22,
+          60
+        ],
+        "line-blur": 20,
+        "line-opacity": 0.35
+      }
+    },
+    {
+      "id": "landcover-outdoors copy 1",
+      "type": "fill",
+      "source": "composite",
+      "maxzoom": 12,
+      "layout": {},
+      "source-layer": "country_boundaries",
+      "paint": {
+        "fill-color": "#46553e"
+      }
+    },
+    {
+      "id": "mapbox-terrain-rgb",
+      "type": "hillshade",
+      "paint": {
+        "hillshade-highlight-color": "#bfc2a2",
+        "hillshade-accent-color": "#667b5c",
+        "hillshade-exaggeration": 1
+      },
+      "source": "mapbox://mapbox.terrain-rgb"
+    }
+  ]
+}
