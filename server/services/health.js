@@ -224,6 +224,12 @@ function achesIndex(weather) {
 /**
  * Breathing. Driven by air quality first, then pollen, then the temperature and
  * humidity extremes that trigger airway irritation.
+ *
+ * Note the direction. Aches counts up with severity; breathing counts up with
+ * *comfort*, because the slide reads it that way — `blength` in slides-loop.js
+ * puts index 10 at the left end of the track, and the arrow's placeholder text
+ * in index.html is "Good". Returning severity here, as this did originally, put
+ * the arrow at the opposite end of the bar from the word it was labelled with.
  */
 function breathingIndex(weather, airQuality, pollenData) {
   const c = weather.current;
@@ -245,11 +251,13 @@ function breathingIndex(weather, airQuality, pollenData) {
   if (c.temperature != null && c.temperature < 25) score += 1;
   if (c.temperature != null && c.temperature > 95) score += 1;
 
-  const index = clamp(Math.round(score), 1, 10);
-  return { index, category: scaleCategory(index), derived: true };
+  // Everything above accumulates severity; the slide wants comfort.
+  const severity = clamp(Math.round(score), 1, 10);
+  const index = 11 - severity;
+  return { index, category: breathingCategory(index), derived: true };
 }
 
-/** 1-10 to the four-band vocabulary the slides render. */
+/** 1-10 to the four-band vocabulary the slides render. Higher is worse. */
 function scaleCategory(index) {
   if (index <= 3) return 'Low';
   if (index <= 5) return 'Moderate';
@@ -257,9 +265,24 @@ function scaleCategory(index) {
   return 'Very High';
 }
 
+/**
+ * Breathing has its own vocabulary and its own direction: higher is better.
+ * "Low breathing" is not a thing anyone says, and the slide ships "Good" as the
+ * arrow's placeholder. The exact strings weather.com used are not recoverable
+ * from anything in this repository, so these are chosen to read correctly
+ * against the end of the track the arrow lands on — `derived: true` already
+ * marks the whole index as a local approximation rather than a licensed one.
+ */
+function breathingCategory(index) {
+  if (index <= 3) return 'Poor';
+  if (index <= 5) return 'Fair';
+  if (index <= 7) return 'Good';
+  return 'Excellent';
+}
+
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
 module.exports = {
   uvIndex, pollen, achesIndex, breathingIndex,
-  POLLEN_CATEGORIES, scaleCategory,
+  POLLEN_CATEGORIES, scaleCategory, breathingCategory,
 };
