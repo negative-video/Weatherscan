@@ -6,7 +6,7 @@ weather API key.
 
 ![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)
 ![Runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-blue.svg)
-![Tests](https://img.shields.io/badge/tests-66-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-69-brightgreen.svg)
 ![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
@@ -95,17 +95,95 @@ end of the forecast array and hung the browser tab. An off-by-one plus an
 inverted failure guard in the nearby-cities scan. Null-row guards in six slide
 parsers. San Francisco's longitude was missing its minus sign.
 
-**Nothing is fetched from a CDN at boot.** jQuery, the marquee plugin,
-mapbox-gl and maplibre-gl were pulled from googleapis, jsdelivr and unpkg on
-every page load, so a display that could not reach those hosts did not start.
-They are vendored under `webroot/js/vendor/`. Only Mapbox *tiles* are remote at
-runtime, which is unavoidable — that is the tile service.
+**No CDN scripts at boot.** jQuery, the marquee plugin, mapbox-gl and
+maplibre-gl were pulled from googleapis, jsdelivr and unpkg on every page load,
+so a display that could not reach those hosts did not start. They are vendored
+under `webroot/js/vendor/`. What is still remote: Mapbox *tiles*, which is
+unavoidable since that is the tile service, and one small font from
+`fonts.gstatic.com` used for the pressure-trend arrows.
+
+**It runs smoothly now.** The single largest cost in the whole app turned out to
+be the weather icons: both sprite sheets are *animated* PNGs, 4864x125 and
+thirty frames, looping forever. A CSS background-image animates for as long as
+anything paints it, and the sidebar icon is never off screen — so every page was
+costing the browser about **65 MB/s of continuous PNG decode** before drawing a
+single pixel of its own. Splitting the sheets into one small file per icon took
+that to under 10 MB/s. Details and the rest of the numbers are
+[below](#performance).
 
 **Security and packaging.** Removed `cors-anywhere`, which was an
 unauthenticated open forward proxy published to the host — and unnecessary,
 since Open-Meteo and RainViewer both send CORS headers. Dropped every npm
 dependency, clearing 25 advisories including 4 critical. Single port, non-root,
 read-only container.
+
+---
+
+## Performance
+
+The upstream simulator was built to look right, and it does. Nobody profiled it,
+though, and a display meant to run unattended for weeks is exactly where that
+shows up — as slides that feel heavy and transitions that judder.
+
+| | Before | After |
+|---|---|---|
+| Condition-icon decode, continuous | **65 MB/s** | **1.8 MB/s** per distinct icon on screen; ~9 MB/s on a busy slide |
+| Icon bytes fetched at boot | 19.7 MB | 2.6 MB |
+| Radar loop, style writes per tick | 26 | 4 |
+| Vendor JS, repeat request | 34 ms of CPU, every time | 48 ms once, then 1.5 ms |
+| Vendor JS caching | revalidated on every page load | cached for a week |
+| Slide-header transition | jQuery tween of `left` — full relayout per frame | compositor-only transform |
+
+**The icon sprite sheets are animated PNGs.** `images/icons2010sprite.png` and
+its 2007 counterpart are 4864x125 APNGs: thirty frames, 33 ms apart, looping
+forever. Every icon on screen is one CSS background pointing at that one file,
+so the browser decodes and composites a 2.32 MB frame thirty times a second for
+as long as the page is open — and twenty-eight of the thirty frames redraw more
+than 90% of the sheet, so there is no cheap dirty-rect path either.
+
+`scripts/split-icon-sprites.js` cuts each sheet into 38 individual 128x125 files
+(icons whose frames never change come out as ordinary static PNGs, which the
+browser does not animate at all). Only the icons a slide actually shows are
+animated: per-frame decode drops from 2.32 MB to 0.061 MB, and a page that used
+to pull 19.7 MB of sprite at boot pulls about 2.6 MB. The splitter is
+zero-dependency Node that honours the APNG dispose and blend ops, and its output
+is pixel-identical to the sheet across all thirty frames — the artwork is
+untouched.
+
+The files are generated during `docker build` and are not checked in. For a
+local run, `npm run split-icons`. The server detects whether they exist and the
+frontend falls back to the sheets if they do not.
+
+**The radar loops did twenty-six style writes to change two layers.** Both loops
+walked the whole thirteen-frame timestamp list on every 100 ms tick and set
+`visibility` on every frame of both maps. They now touch only the frame going
+out and the frame coming in. A related bug: each tick called `clearInterval` on
+a shared global rather than on its own handle, so two overlapping loops would
+orphan a 10 Hz timer driving two WebGL maps for the life of the page — which is
+the sort of thing you only notice on day three.
+
+**The slide-name header animated a layout property.** `$scroller.animate({left})`
+made jQuery relayout the entire header strip on every frame of a 900 ms tween,
+which is why that transition was the choppiest thing in the loop. It is now a
+`transform` animation the compositor handles on its own, composited onto the
+stylesheet's existing scale so it lands on exactly the same pixel as before.
+
+**Static assets are compressed once.** Every request used to re-run gzip over
+the file — 34 ms of CPU for `mapbox-gl.js` alone, on a container capped at a
+single core, repeated for every viewer and every reload. Compressed responses
+are now held in memory, keyed by path, size and mtime, so an edited file is
+never served stale. The pinned vendor bundles under `js/vendor/` and
+`js/jplayer/` are cached for a week rather than revalidated on every load;
+`js/config.js` still revalidates every time, because it is a file you are told
+to edit.
+
+**Two things worth checking on your own display.** The radar and minimap
+surfaces stack three WebGL maps each — two of them exist only to draw a drop
+shadow, which is the upstream design. If the browser showing this runs *without*
+GPU acceleration, common in a VM, that will dominate everything above; check
+`chrome://gpu`. And `weatherscan.css` still pulls one small font from
+`fonts.gstatic.com` for the pressure-trend arrows, which is the last thing the
+frontend fetches off-origin at boot.
 
 ---
 
@@ -290,9 +368,14 @@ every shape inspectable with `curl`.
 
 ```bash
 npm run dev      # auto-restart, request logging
-npm test         # 66 tests, no dependencies
+npm test         # 69 tests, no dependencies
 npm run check    # probe every configured data source
+npm run split-icons  # cut the animated icon sheets into per-icon files
 ```
+
+`docker build` runs `split-icons` for you. Run it by hand for a local `npm
+start`, or the frontend falls back to the 20 MB animated sprite sheets and the
+browser pays for it — see [Performance](#performance).
 
 Tests hit live upstream APIs. `SKIP_NETWORK_TESTS=1` runs only the offline logic
 tests.
