@@ -71,14 +71,16 @@ const TEST_LON = -78.4767;
       return 'accepted';
     });
 
-    // A fork of the upstream styles is the safe configuration; warn if the
-    // deployment is still relying on someone else's account.
-    const usingUpstream = config.mapbox.radarStyle.includes('goldbblazez');
-    if (usingUpstream) {
-      line('warn', 'Mapbox styles',
-        'using the upstream author\'s public styles; fork them into your own account to be safe');
+    // Not a style preference: the upstream styles' vector data is private, so
+    // on the defaults the maps genuinely cannot draw roads, borders or labels.
+    // That is a broken configuration, not a warning.
+    if (config.usingUpstreamStyles) {
+      line('fail', 'Mapbox styles',
+        'MAPBOX_STYLE_* unset — falling back to the upstream author\'s styles, whose\n' +
+        '       vector data is private. Maps will show terrain and water only.\n' +
+        '       Fix: MAPBOX_WRITE_TOKEN=sk.… npm run fork-styles -- --create');
     } else {
-      line('ok', 'Mapbox styles', 'custom');
+      line('ok', 'Mapbox styles', 'custom (forked into your account)');
     }
   }
 

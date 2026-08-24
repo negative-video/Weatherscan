@@ -129,6 +129,24 @@ function toPlainText(raw, maxLength = 300) {
   return text;
 }
 
+/**
+ * Feed generators report their own failures as ordinary items. RSS-Bridge in
+ * particular emits "Bridge returned error 401! (20689)" as a titled entry, so a
+ * broken bridge scrolls across the display looking like a headline. Drop those
+ * rather than broadcasting someone's stack trace.
+ */
+const FEED_ERROR_PATTERNS = [
+  /bridge returned error/i,
+  /^bridge (not found|error)/i,
+  /^error\s*\d{3}\b/i,
+  /^\s*(fatal|uncaught)\s+(error|exception)/i,
+  /^could not request/i,
+];
+
+function looksLikeFeedError(title) {
+  return FEED_ERROR_PATTERNS.some((re) => re.test(title));
+}
+
 function parseDate(value) {
   if (!value) return null;
   const t = Date.parse(value);
@@ -210,7 +228,17 @@ function parseFeed(text) {
   else if (/<item[\s>]/i.test(trimmed)) items = parseRSS(trimmed);
   else items = parseAtom(trimmed);
 
-  return { title: feedTitle(trimmed, isJSON), items: items.filter((i) => i.title) };
+  const usable = [];
+  let errors = 0;
+  for (const item of items) {
+    if (!item.title) continue;
+    if (looksLikeFeedError(item.title)) { errors++; continue; }
+    usable.push(item);
+  }
+  if (errors) {
+    console.warn(`[marquee] dropped ${errors} error item(s) reported by the feed itself`);
+  }
+  return { title: feedTitle(trimmed, isJSON), items: usable };
 }
 
 // --- public ---------------------------------------------------------------
@@ -272,5 +300,6 @@ function staticItems() {
 }
 
 module.exports = {
-  marqueeItems, parseFeed, toPlainText, decodeEntities, parseRSS, parseAtom, parseJSONFeed,
+  marqueeItems, parseFeed, toPlainText, decodeEntities,
+  parseRSS, parseAtom, parseJSONFeed, looksLikeFeedError,
 };

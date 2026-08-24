@@ -67,13 +67,25 @@ const config = {
   mapboxKey: env('MAPBOX_API_KEY', env('MAPBOX_TOKEN', '')),
 
   mapbox: {
-    // Style IDs are overridable so a deployment is not hostage to the
-    // upstream author's Mapbox account remaining public.
+    /**
+     * These fall back to the upstream author's styles, which are readable by
+     * any token but pull their vector data from that account's *private*
+     * tilesets. Mapbox fails a composite source when any member is
+     * inaccessible, so on the defaults you get terrain and water but no roads,
+     * borders or city labels. They are a last resort, not a working setup —
+     * run `npm run fork-styles` and set these. usingUpstreamStyles below
+     * reports whether a deployment is still on them.
+     */
     radarStyle: env('MAPBOX_STYLE_RADAR', 'mapbox://styles/goldbblazez/cl10wz58y000q14ptdm3vkmxe'),
     satelliteStyle: env('MAPBOX_STYLE_SATELLITE', 'mapbox://styles/goldbblazez/cl188bbm3000f14rmh9mcqbp8'),
     miniStyle: env('MAPBOX_STYLE_MINIMAP', 'mapbox://styles/goldbblazez/cl11ctjbl000014s02fijkmyc'),
     baseStyleUser: env('MAPBOX_BASE_STYLE_USER', 'goldbblazez'),
     baseStyleId: env('MAPBOX_BASE_STYLE_ID', 'cl6jfozbb001h15sdx9ze69f7'),
+  },
+
+  /** True when no MAPBOX_STYLE_* override is configured. */
+  get usingUpstreamStyles() {
+    return !env('MAPBOX_STYLE_RADAR', '') && !env('MAPBOX_STYLE_MINIMAP', '');
   },
 
   homeAssistant: {
@@ -159,6 +171,15 @@ function describe() {
   }
   lines.push(`map tiles       ${config.mapboxKey ? 'mapbox key set' : 'NO MAPBOX KEY — maps will not render'}`);
   if (!config.mapboxKey) problems.push('MAPBOX_API_KEY is not set; radar and minimap surfaces will be blank');
+  lines.push(`map styles      ${config.usingUpstreamStyles
+    ? 'UPSTREAM DEFAULTS — no roads, borders or labels'
+    : 'custom (forked)'}`);
+  if (config.usingUpstreamStyles) {
+    problems.push('MAPBOX_STYLE_* are unset, so the maps fall back to the upstream author\'s');
+    problems.push('  styles. Those read fine but their vector data is private, so the maps will');
+    problems.push('  show terrain and water only — no roads, state lines or city labels.');
+    problems.push('  Fix: MAPBOX_WRITE_TOKEN=sk.… npm run fork-styles -- --create');
+  }
   lines.push(`radar           ${config.features.radar ? 'RainViewer' : 'disabled'}`);
   lines.push(`satellite       ${config.features.satellite ? 'NASA GIBS (GOES)' : 'disabled'}`);
   lines.push(`alerts          ${config.features.alerts ? 'NWS api.weather.gov' : 'disabled'}`);

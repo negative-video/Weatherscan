@@ -154,6 +154,7 @@ npm run check
 | | Required? | Why |
 |---|---|---|
 | **Mapbox token** | Yes | Map tiles for radar, satellite and mini-map. Free tier. |
+| **Forked map styles** | Yes | Without them the maps draw terrain and water but no roads, borders or labels — see below. |
 | Weather API key | **No** | Open-Meteo needs none. |
 | Pollen key | Optional | The pollen slide self-skips without one. |
 | RSS feed | Optional | The lower ticker falls back to static text. |

@@ -154,3 +154,37 @@ test('a script tag inside a feed title never reaches the output', () => {
   assert.strictEqual(feed.items.length, 1);
   assert.ok(!feed.items[0].title.toLowerCase().includes('script'), feed.items[0].title);
 });
+
+// --- feed-reported errors --------------------------------------------------
+
+test('items that are the feed reporting its own failure are dropped', () => {
+  // RSS-Bridge emits these as ordinary titled entries, so without filtering a
+  // broken bridge scrolls across the display looking like a headline.
+  for (const title of [
+    'Bridge returned error 401! (20689)',
+    'Bridge Not Found',
+    'Error 503 upstream unavailable',
+  ]) {
+    assert.ok(feeds.looksLikeFeedError(title), `should drop: ${title}`);
+  }
+});
+
+test('real headlines containing the word error are kept', () => {
+  for (const title of [
+    'Council approves error-correction funding',
+    'Trial and error: inside the lab',
+    'Storm warning issued for coastal counties',
+  ]) {
+    assert.ok(!feeds.looksLikeFeedError(title), `should keep: ${title}`);
+  }
+});
+
+test('parseFeed strips error items but keeps the rest of the feed', () => {
+  const xml = `<rss><channel><title>Wire</title>
+    <item><title>Bridge returned error 401! (20689)</title></item>
+    <item><title>Council approves new park</title></item>
+  </channel></rss>`;
+  const feed = feeds.parseFeed(xml);
+  assert.strictEqual(feed.items.length, 1);
+  assert.strictEqual(feed.items[0].title, 'Council approves new park');
+});
