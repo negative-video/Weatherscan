@@ -11,6 +11,7 @@
     "dev": "LOG_REQUESTS=true NODE_ENV=development node --watch server/index.js",
     "test": "node --test \"test/*.test.js\"",
     "check": "node scripts/check-config.js",
+    "split-icons": "node scripts/split-icon-sprites.js",
     "docker:build": "docker build -t weatherscan:latest .",
     "docker:run": "docker run --rm -p 8080:8080 --env-file .env weatherscan:latest",
     "docker:up": "docker compose up -d",

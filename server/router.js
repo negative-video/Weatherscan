@@ -15,6 +15,22 @@ const health = require('./services/health');
 const feeds = require('./services/feeds');
 
 /**
+ * Whether scripts/split-icon-sprites.js has been run for this deployment.
+ *
+ * The condition icons ship as two 4864x125 thirty-frame APNG sheets. Used
+ * directly they cost the browser roughly 65 MB/s of continuous PNG decode,
+ * because a CSS background-image keeps animating for as long as anything paints
+ * it and the sidebar icon is never off screen. The split writes one 128x125
+ * file per icon so only the icons a slide shows are animated.
+ *
+ * Probed once at startup: a deployment either has the files or it does not, and
+ * the frontend needs to know which before it styles its first icon.
+ */
+const ICONS_SPLIT = require('fs').existsSync(
+  require('path').join(__dirname, '..', 'webroot', 'images', 'icons', '2010', '0.png')
+);
+
+/**
  * Everything under /api. Two families live here:
  *
  *   /api/wx/...  the weather.com-compatible surface the untouched IntelliStar
@@ -317,6 +333,7 @@ async function handleModern(req, res, rest, query) {
       provider: config.provider,
       radarUpdateIntervalMs: config.cache.radarMs,
       weatherRefreshMs: config.cache.weatherMs,
+      iconsSplit: ICONS_SPLIT,
     });
   }
 

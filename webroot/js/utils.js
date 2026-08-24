@@ -136,7 +136,30 @@ function getCCicon(imgDiv,ccCode, windData){
 			icon = 35
 		}
 	}
-	$(imgDiv).css('background-image', `url("/images/icons${apperanceSettings.iconSet}sprite.png`)
+	// An unmapped condition code used to produce a NaN background-position,
+	// which CSS discards — leaving the element on whatever its stylesheet says.
+	// Keep that behaviour rather than asking for an icon cell that isn't there.
+	if (icon === undefined) return;
+
+	// The sprite sheets are thirty-frame APNGs. A CSS background-image animates
+	// for as long as anything paints it, and the sidebar icon is on screen
+	// permanently, so pointing every icon at the 4864x125 sheet made the browser
+	// decode and composite ~65 MB/s of PNG forever, on every slide. When the
+	// per-icon files are present each element animates its own 128x125 image
+	// instead. See scripts/split-icon-sprites.js.
+	if (window.weatherscanConfig && window.weatherscanConfig.iconsSplit) {
+		$(imgDiv).css({
+			'background-image': `url("/images/icons/${apperanceSettings.iconSet}/${icon}.png")`,
+			// A cell is one 38th of the sheet, and the sheet was sized to 3700%
+			// of the element, so a lone cell covers 3700/38 = 97.368%. The
+			// vertical 95.65% matches every .icon rule in the stylesheet.
+			'background-size': '97.368% 95.65%',
+			'background-position-x': '0%'
+		});
+		return;
+	}
+
+	$(imgDiv).css('background-image', `url("/images/icons${apperanceSettings.iconSet}sprite.png")`)
 	$(imgDiv).css('background-position-x', `${(100/37)*icon}%`)
 }
 

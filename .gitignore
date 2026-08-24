@@ -109,3 +109,8 @@ typings/
 
 # Mapbox write token, used only by scripts/fork-mapbox-styles.js
 .mapbox-write-token
+
+# Per-icon condition sprites, cut from webroot/images/icons*sprite.png by
+# scripts/split-icon-sprites.js. ~50MB of derived files; the Docker build
+# regenerates them, and `npm run split-icons` does the same for a local run.
+webroot/images/icons/

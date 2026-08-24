@@ -14,7 +14,10 @@ npm-debug.log
 package-lock.json
 
 test/
-scripts/
+# The image builds the split icon sprites, so it needs that one script. The
+# Mapbox fork tool reads a write token and has no business in the image.
+scripts/*
+!scripts/split-icon-sprites.js
 *.md
 !README.md
 
@@ -33,3 +36,7 @@ logs/
 
 # Vendored source maps are dev artifacts; ~930KB of dead weight in the image.
 **/*.js.map
+
+# Derived from the sprite sheets by scripts/split-icon-sprites.js during the
+# build. Never copy a host copy in; it would only be stale weight in the context.
+webroot/images/icons/

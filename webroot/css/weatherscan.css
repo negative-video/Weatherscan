@@ -6174,7 +6174,9 @@ label{
   background-repeat: no-repeat;
   background-size: 3700% 95.65%;
   background-position: 51.35% 85.5%;
-  background-image: url(images/icons2010sprite.png);
+  /* No background-image here on purpose. getCCicon() sets one on every hourly
+     tile as it is built, and naming the sheet here made the browser animate the
+     whole 4864x125 APNG even in deployments using the split per-icon files. */
   height: 103.5px;
   width: 103.5px;
   left: 7.5px;
