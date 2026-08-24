@@ -60,12 +60,19 @@ $(function(){
 })
 
 //time manager
+// Writing both fields every tick replaced their text nodes once a second and
+// invalidated the layout of the header with them, for a date that changes once
+// a day. Only write what actually changed.
+var lastDateText = null, lastTimeText = null;
 setInterval(
   function () {
     var today = new Date();
 
-    $('#date').text( today.toString().slice(4,10).trimRight() );
-    $('#time').text( today.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true, minute: 'numeric', second: 'numeric' }).replace(/ /g,'') );
+    var dateText = today.toString().slice(4,10).trimRight();
+    if (dateText !== lastDateText) { lastDateText = dateText; $('#date').text(dateText); }
+
+    var timeText = today.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true, minute: 'numeric', second: 'numeric' }).replace(/ /g,'');
+    if (timeText !== lastTimeText) { lastTimeText = timeText; $('#time').text(timeText); }
   }
 , 1000);
 //location pull
