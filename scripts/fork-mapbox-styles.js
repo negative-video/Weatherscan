@@ -112,6 +112,12 @@ function pruneSources(style) {
   const dropped = [];
   for (const src of Object.values(style.sources || {})) {
     if (!src.url || !src.url.startsWith('mapbox://')) continue;
+
+    // Only vector sources are composites. A raster-dem source names exactly one
+    // tileset, and appending a vector one to it produces a combination Mapbox
+    // rejects with a 400 — which silently kills the hillshade layer.
+    if (src.type !== 'vector') continue;
+
     const members = src.url.replace('mapbox://', '').split(',');
     const kept = members.filter((m) => {
       const isPublic = PUBLIC_TILESETS.has(m) || m.startsWith('mapbox.');
@@ -152,10 +158,29 @@ function stripServerFields(style) {
   return style;
 }
 
+/** Read the style ids already configured in .env, so --update can target them. */
+function readStyleIdsFromEnv() {
+  const envPath = path.join(__dirname, '..', '.env');
+  if (!fs.existsSync(envPath)) return {};
+  const out = {};
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const m = /^(MAPBOX_STYLE_[A-Z]+|MAPBOX_BASE_STYLE_ID)=(.+)$/.exec(line.trim());
+    if (!m) continue;
+    // Accept either a bare id or a full mapbox://styles/user/id value.
+    out[m[1]] = m[2].trim().split('/').pop();
+  }
+  return out;
+}
+
 async function main() {
   const token = process.env.MAPBOX_WRITE_TOKEN;
   const create = process.argv.includes('--create');
+  const update = process.argv.includes('--update');
   const outDir = path.join(__dirname, '..', 'mapbox-styles');
+
+  // --update rewrites the styles already referenced by .env, so their ids —
+  // and therefore the .env you have already configured — stay valid.
+  const existing = update ? readStyleIdsFromEnv() : {};
 
   if (!token) {
     console.error('MAPBOX_WRITE_TOKEN is not set.');
@@ -178,7 +203,9 @@ async function main() {
     process.exit(1);
   }
   console.log(`account: ${username}`);
-  console.log(create ? 'mode:    CREATE\n' : 'mode:    dry run (pass --create to publish)\n');
+  console.log(update ? 'mode:    UPDATE existing styles in place\n'
+    : create ? 'mode:    CREATE\n'
+    : 'mode:    dry run (pass --create to publish, --update to rewrite)\n');
 
   fs.mkdirSync(outDir, { recursive: true });
   const results = [];
@@ -200,7 +227,18 @@ async function main() {
     console.log(`${style.layers.length} layers, ${dropped.length} private tileset(s) dropped, ${changes.length} layer(s) repointed`);
     for (const c of changes) console.log(`           ${c}`);
 
-    if (create) {
+    if (update) {
+      const styleId = existing[spec.env];
+      if (!styleId) {
+        console.log(`           no id for ${spec.env} in .env — skipped`);
+      } else {
+        await api(
+          `https://api.mapbox.com/styles/v1/${username}/${styleId}?access_token=${token}`,
+          { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(style) }
+        );
+        console.log(`           updated -> mapbox://styles/${username}/${styleId}`);
+      }
+    } else if (create) {
       const made = await api(
         `https://api.mapbox.com/styles/v1/${username}?access_token=${token}`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(style) }

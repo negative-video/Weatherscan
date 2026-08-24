@@ -42,7 +42,7 @@
   "pitch": 0,
   "sources": {
     "mapbox://mapbox.terrain-rgb": {
-      "url": "mapbox://mapbox.terrain-rgb,mapbox.mapbox-streets-v8",
+      "url": "mapbox://mapbox.terrain-rgb",
       "type": "raster-dem",
       "tileSize": 256
     },
