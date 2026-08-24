@@ -41,6 +41,42 @@ const LONG_CACHE = new Set([
   '.woff', '.woff2', '.ttf', '.otf', '.eot', '.mp3', '.ogg', '.wav', '.swf',
 ]);
 
+// Pinned third-party bundles. These are checked in at a fixed version and are
+// not files anyone is expected to edit, so they get the same hard cache as the
+// media — which matters because mapbox-gl and maplibre-gl are 1.6 MB between
+// them and were being revalidated, and re-compressed, on every page load.
+const IMMUTABLE_DIRS = ['/js/vendor/', '/js/jplayer/'];
+
+/**
+ * Compressed responses, held in memory and keyed by path plus size and mtime so
+ * an edited file is never served from a stale entry.
+ *
+ * Without this every request re-ran gzip over the file: 34ms of CPU for
+ * mapbox-gl.js alone, on a container capped at a single core, repeated for
+ * every viewer and every reload. The whole compressible set is a few megabytes,
+ * and the container runs read-only, so memory is the only place to put it.
+ */
+const gzipCache = new Map();
+let gzipCacheBytes = 0;
+const GZIP_CACHE_MAX_BYTES = 16 * 1024 * 1024;
+const GZIP_MAX_FILE_BYTES = 8 * 1024 * 1024;
+
+function cachedGzip(target, stat) {
+  const key = `${target}:${stat.size}:${stat.mtimeMs}`;
+  const hit = gzipCache.get(key);
+  if (hit) return hit;
+
+  // Compress once and keep it, so the level is chosen for size rather than for
+  // how often we can afford to pay for it.
+  const body = zlib.gzipSync(fs.readFileSync(target), { level: 9 });
+
+  if (gzipCacheBytes + body.length <= GZIP_CACHE_MAX_BYTES) {
+    gzipCache.set(key, body);
+    gzipCacheBytes += body.length;
+  }
+  return body;
+}
+
 /**
  * Minimal static file server.
  *
@@ -88,11 +124,15 @@ function createStaticHandler(root) {
       ETag: etag,
       'Last-Modified': stat.mtime.toUTCString(),
       'X-Content-Type-Options': 'nosniff',
-      // Media and fonts never change, so cache them hard. Code and markup are
-      // revalidated every time: config.js is a file users are told to edit, and
-      // a max-age on it means an edit appears to do nothing until it expires.
-      // Revalidation is a 304 against the ETag, which costs almost nothing.
-      'Cache-Control': LONG_CACHE.has(ext) ? 'public, max-age=604800' : 'no-cache',
+      // Media, fonts and pinned vendor bundles never change, so cache them
+      // hard. The rest of the code and the markup are revalidated every time:
+      // config.js is a file users are told to edit, and a max-age on it means
+      // an edit appears to do nothing until it expires. Revalidation is a 304
+      // against the ETag, which costs almost nothing.
+      'Cache-Control':
+        LONG_CACHE.has(ext) || IMMUTABLE_DIRS.some((dir) => rel.startsWith(dir))
+          ? 'public, max-age=604800'
+          : 'no-cache',
     };
 
     if (req.method === 'HEAD') {
@@ -127,8 +167,18 @@ function createStaticHandler(root) {
 
     const acceptsGzip = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
     if (acceptsGzip && COMPRESSIBLE.has(ext) && stat.size > 1024) {
-      headers['Content-Encoding'] = 'gzip';
       headers.Vary = 'Accept-Encoding';
+      if (stat.size <= GZIP_MAX_FILE_BYTES) {
+        const body = cachedGzip(target, stat);
+        headers['Content-Encoding'] = 'gzip';
+        headers['Content-Length'] = body.length;
+        res.writeHead(200, headers);
+        res.end(body);
+        return true;
+      }
+      // Anything larger than the cache will take is streamed as before rather
+      // than buffered whole.
+      headers['Content-Encoding'] = 'gzip';
       res.writeHead(200, headers);
       fs.createReadStream(target).pipe(zlib.createGzip({ level: 6 })).pipe(res);
       return true;
