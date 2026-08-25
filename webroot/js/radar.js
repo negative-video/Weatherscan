@@ -491,22 +491,12 @@ function fadeMap(divID, fadein, zoom) {
 		} else {
 			satellite.fadeOut(MAP_FADE_MS)
 		}
-	} else if (divID == 'minimap') {
-		if (sortedtimestampsmini) {
-		sortedtimestampsmini.forEach((timestamp, index) => {
-			miniradar.setPaintProperty(
-				`radarlayer_${timestamp.ts}`,
-				"raster-opacity",
-					(fadein == true) ? 1 : 0
-				);
-			minimap.setPaintProperty(
-				`radarlayer_${timestamp.ts}`,
-				"raster-opacity",
-					(fadein == true) ? .5 : 0
-			);
-		});
-		}
 	}
+	// The mini radar has no branch here. It is never hidden — it sits in the
+	// sidebar for the life of the page — and now that frames are added dark and
+	// the loop raises one at a time, there is nothing for a fade to do. The old
+	// branch set every frame lit at once, which with an opacity-driven loop
+	// would stack all thirteen on top of each other.
 }
 /**
  * Rebuild one surface's frame layers from the current series.
@@ -577,7 +567,7 @@ function loadRadarImages(divID) {
 	            maxzoom: rainViewerConfig.satelliteMaxZoom
 	          },
 	          layout: { visibility: "visible" },
-						paint: {'raster-fade-duration': .5, 'raster-opacity':1,'raster-brightness-max':1},
+						paint: {'raster-fade-duration': .5, 'raster-opacity':0,'raster-opacity-transition':{duration:0},'raster-brightness-max':1},
 	          minzoom: 0,
 	          maxzoom: 8,
 	        });
@@ -586,17 +576,6 @@ function loadRadarImages(divID) {
 			.catch(console.error);
 		}
 	if (divID != 'satrad-1') {
-	// How strongly the frames paint once they are up. The labelled map carries
-	// them at half so its roads and city names read through; the raster-only
-	// surface underneath carries them at full. fadeMap used to assign this on
-	// every fade, but the slide crossfade is now done on the container, so this
-	// is a level set once at add time.
-	//
-	// The minimap is the exception: it rebuilds its layers in place while it is
-	// on screen, and they are added visible, so it still needs them to come up
-	// dark and be raised by fadeMap('minimap', true) once the rebuild settles.
-	var frameOpacity = (divID == 'minimap') ? 0 : 1;
-	var labelledFrameOpacity = (divID == 'minimap') ? 0 : 0.5;
 	// Use RainViewer for radar data
 	pending = rainViewerConfig.getRadarSeries()
     .then(data => {
@@ -617,7 +596,7 @@ function loadRadarImages(divID) {
             maxzoom: rainViewerConfig.radarMaxZoom
           },
           layout: { visibility: "visible" },
-					paint: {'raster-fade-duration': .5, 'raster-opacity':frameOpacity,'raster-brightness-max':0.9},
+					paint: {'raster-fade-duration': .5, 'raster-opacity':0,'raster-opacity-transition':{duration:0},'raster-brightness-max':0.9},
           minzoom: 5,
           maxzoom: 8
         });
@@ -633,7 +612,7 @@ function loadRadarImages(divID) {
             maxzoom: rainViewerConfig.radarMaxZoom
           },
           layout: { visibility: "visible" },
-					paint: {'raster-fade-duration': .5,'raster-opacity':labelledFrameOpacity,'raster-brightness-max':0.9},
+					paint: {'raster-fade-duration': .5,'raster-opacity':0,'raster-opacity-transition':{duration:0},'raster-brightness-max':0.9},
           minzoom: 5,
           maxzoom: 12
         });
@@ -643,6 +622,12 @@ function loadRadarImages(divID) {
 		}
 	return pending;
 }
+// How strongly a frame paints when the loop is resting on it. The labelled map
+// carries them at half so its roads and city names read through; the
+// raster-only surface underneath carries them at full.
+var FRAME_OPACITY = 1;
+var LABELLED_FRAME_OPACITY = 0.5;
+
 // One loop is a frame every RADAR_FRAME_MS, then a pause on the last frame
 // before the next pass starts. Both loops below tick on these, and
 // radarLoopCount() budgets against them, so the three cannot drift apart.
@@ -675,29 +660,45 @@ function radarLoopCount(divID, slideDuration) {
 /**
  * Show one frame of a radar loop.
  *
- * Both loops used to walk the whole timestamp list on every 100ms tick and set
- * `visibility` on all thirteen frames of both maps — twenty-six calls to change
- * two layers. mapbox-gl and maplibre-gl short-circuit a write that matches the
- * current value, so the redundant twenty-four were not repaints, but they were
- * still twenty-four layer lookups and deep-equals per tick per loop, ten times a
- * second, for as long as the page is open.
+ * Stepping the loop moves `raster-opacity`, not `visibility`, and the
+ * difference is the whole reason the loop renders at all.
+ *
+ * A layer's source is only kept alive while some layer using it is *not*
+ * hidden, and both libraries decide that from `visibility` and the zoom range —
+ * never from opacity. Hiding a frame therefore dropped its source, and dropping
+ * a source evicts its tiles: measured mid-loop, the one visible frame held its
+ * two tiles and all twelve others held zero. Every frame was re-fetching its
+ * tiles from nothing during the 100ms it was on screen, so whichever tile
+ * arrived first drew and the rest of the map stayed empty. Only the frame the
+ * loop happened to rest on had time to finish, which is why the newest frame
+ * looked complete and the others were missing their left and right edges.
+ *
+ * Opacity has neither problem. Both libraries return early from the raster draw
+ * when it is 0, so a frame that is not showing still costs nothing to render,
+ * but its source stays used and its tiles stay resident — every frame is fully
+ * loaded before the loop ever reaches it.
+ *
+ * Each surface carries its own lit value: the raster-only map draws frames at
+ * full strength, the labelled map at half so its roads and city names read
+ * through.
  *
  * `prev < 0` means the caller wants the whole list reset, which is what the
- * first tick of a loop needs: layers are added visible, so everything except
- * frame zero has to be hidden once before stepping.
+ * first tick of a loop needs: layers are added dark, so frame zero has to be
+ * raised once before stepping.
  */
-function showRadarFrame(maps, timestamps, prefix, index, prev) {
-	maps.forEach(function (m) {
+function showRadarFrame(surfaces, timestamps, prefix, index, prev) {
+	surfaces.forEach(function (surface) {
+		var m = surface.map;
 		if (!m) return;
 		if (prev < 0) {
 			timestamps.forEach(function (timestamp, i) {
-				m.setLayoutProperty(`${prefix}${timestamp.ts}`, 'visibility', i === index ? 'visible' : 'none');
+				m.setPaintProperty(`${prefix}${timestamp.ts}`, 'raster-opacity', i === index ? surface.opacity : 0);
 			});
 		} else {
 			if (prev !== index && timestamps[prev]) {
-				m.setLayoutProperty(`${prefix}${timestamps[prev].ts}`, 'visibility', 'none');
+				m.setPaintProperty(`${prefix}${timestamps[prev].ts}`, 'raster-opacity', 0);
 			}
-			m.setLayoutProperty(`${prefix}${timestamps[index].ts}`, 'visibility', 'visible');
+			m.setPaintProperty(`${prefix}${timestamps[index].ts}`, 'raster-opacity', surface.opacity);
 		}
 	});
 }
@@ -745,10 +746,10 @@ function animateRadar(divID, loopnum, maxloop) {
 			},RADAR_LOOP_PAUSE_MS)
     } else {
 			var prefix = (divID == 'satrad-1') ? 'satradlayer_' : 'radarlayer_';
-			showRadarFrame([radardiv], sortedmaptimestamps, prefix, i, i - 1);
-			if (divID != 'satrad-1') {
-				showRadarFrame([mapdiv], sortedmaptimestamps, 'radarlayer_', i, i - 1);
-			}
+			var surfaces = (divID == 'satrad-1')
+				? [{ map: radardiv, opacity: FRAME_OPACITY }]
+				: [{ map: radardiv, opacity: FRAME_OPACITY }, { map: mapdiv, opacity: LABELLED_FRAME_OPACITY }];
+			showRadarFrame(surfaces, sortedmaptimestamps, prefix, i, i - 1);
       i += 1;
     }
   }, RADAR_FRAME_MS);
@@ -771,7 +772,9 @@ function animateMiniRadar() {
 				return;
 			},RADAR_LOOP_PAUSE_MS)
     } else {
-			showRadarFrame([miniradar, minimap], sortedtimestampsmini, 'radarlayer_', i, i - 1);
+			showRadarFrame(
+				[{ map: miniradar, opacity: FRAME_OPACITY }, { map: minimap, opacity: LABELLED_FRAME_OPACITY }],
+				sortedtimestampsmini, 'radarlayer_', i, i - 1);
       i += 1;
     }
   }, RADAR_FRAME_MS);

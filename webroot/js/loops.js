@@ -14,16 +14,13 @@ function Loops() {
 	//
 	// Sequenced on loadRadarImages' promise rather than on the map's next idle:
 	// the layers are added after an asynchronous fetch, and a map that has been
-	// sitting on screen is already idle, so the old ordering would have raised
-	// the opacity and started the loop before the new frames existed. It only
-	// held together at startup because a map that has just loaded stays busy
-	// with tiles for a second or two first.
+	// sitting on screen is already idle, so the old ordering would have started
+	// the loop before the new frames existed. It only held together at startup
+	// because a map that has just loaded stays busy with tiles for a second or
+	// two first. The frames come up dark and the loop raises them, so there is
+	// no fade to sequence around any more.
 	function refreshMiniRadar() {
-		fadeMap('minimap', false)
-		loadRadarImages('minimap').then(function () {
-			fadeMap('minimap', true)
-			animateMiniRadar()
-		})
+		loadRadarImages('minimap').then(animateMiniRadar)
 	}
 	function refreshObservationDisplay() {
 		var cond = weatherInfo.currentCond.sidebar.cond;
