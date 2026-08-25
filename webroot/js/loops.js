@@ -10,6 +10,21 @@ function Loops() {
 	setInterval(refreshObservationDisplay,300000);
 
 }
+	// Rebuild the mini radar's frames and start it looping again.
+	//
+	// Sequenced on loadRadarImages' promise rather than on the map's next idle:
+	// the layers are added after an asynchronous fetch, and a map that has been
+	// sitting on screen is already idle, so the old ordering would have raised
+	// the opacity and started the loop before the new frames existed. It only
+	// held together at startup because a map that has just loaded stays busy
+	// with tiles for a second or two first.
+	function refreshMiniRadar() {
+		fadeMap('minimap', false)
+		loadRadarImages('minimap').then(function () {
+			fadeMap('minimap', true)
+			animateMiniRadar()
+		})
+	}
 	function refreshObservationDisplay() {
 		var cond = weatherInfo.currentCond.sidebar.cond;
 		// The trailing colon only belongs there once a location has resolved;
@@ -22,15 +37,18 @@ function Loops() {
 			if (loopssevereweathermode == false){
 				$('#minimap').fadeIn(0)
 				$('#minimap-title').fadeIn(0)
-				minimap.on('load', function() {
-					fadeMap('minimap', false)
-			    loadRadarImages('minimap')
-						minimap.once('idle', function() {
-							fadeMap('minimap', true)
-							animateMiniRadar()
-						});
-			  });
-				//animateRadar('minimap')
+				// Run now if the map is already up, and otherwise exactly once when it
+				// comes up. This used to be a plain minimap.on('load'), which only
+				// works the first time through: 'load' fires once per map, so every
+				// later refresh registered a handler that could never run. The mini
+				// radar then looped whatever frames were fetched at startup for as
+				// long as the display stayed on, and a dead closure piled up every
+				// five minutes.
+				if (minimap.loaded()) {
+					refreshMiniRadar()
+				} else {
+					minimap.once('load', refreshMiniRadar)
+				}
 			}
 		} else {
 			$('#minimap').fadeOut(0)

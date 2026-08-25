@@ -308,7 +308,7 @@ var mainMap
 				}
 				,localDoppler() {
 					var locthing = (location == 0) ? maincitycoords : locList[location - 1]
-					var zoom = 7.7, maxloop = Math.ceil((slideDelay)*(11/60000)), lat = locthing.lat, lon = locthing.lon
+					var zoom = 7.7, maxloop = radarLoopCount('radar-1', slideDelay), lat = locthing.lat, lon = locthing.lon
 					weatherAudio.playLocalRadar();
 					$('.radar-slide').fadeIn(0);
 					$('.radar-content').fadeIn(0);
@@ -333,7 +333,7 @@ var mainMap
 				}
 				,regionalSatellite() {
 					var locthing = (location == 0) ? maincitycoords : locList[location - 1]
-					var zoom = 4.5, maxloop = Math.ceil((slideDelay)*(11/60000)), lat = locthing.lat, lon = locthing.lon
+					var zoom = 4.5, maxloop = radarLoopCount('satrad-1', slideDelay), lat = locthing.lat, lon = locthing.lon
 					$('.radar-slide .radar-legends .pastlegend').text('Past 5 Hours')
 					$('.radar-slide').fadeIn(0);
 					$('.radar-content').fadeIn(0);

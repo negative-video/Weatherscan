@@ -201,7 +201,10 @@ function initBasemaps() {
 					'source': 'maincitypoint', // reference the data source
 					'layout': {
 						'text-field': maincitycoords.displayname,
-						'text-font': ["Frutiger Bold"],
+						// Same stack the styles use. Mapbox serves a comma-separated
+						// stack by skipping fonts the account does not have, but a bare
+						// "Frutiger Bold" 404s outright and the label never draws.
+						'text-font': ["Frutiger Bold", "Arial Unicode MS Regular"],
 						'text-size': 28,
 						'text-line-height': 1.2,
 						'text-max-width': 10,
@@ -223,7 +226,10 @@ function initBasemaps() {
 					'source': 'maincitypoint', // reference the data source
 					'layout': {
 						'text-field': maincitycoords.displayname,
-						'text-font': ["Frutiger Bold"],
+						// Same stack the styles use. Mapbox serves a comma-separated
+						// stack by skipping fonts the account does not have, but a bare
+						// "Frutiger Bold" 404s outright and the label never draws.
+						'text-font': ["Frutiger Bold", "Arial Unicode MS Regular"],
 						'text-size': 28,
 						'text-line-height': 1.2,
 						'text-max-width': 10,
@@ -359,7 +365,10 @@ function initBasemaps() {
 					'source': 'maincitypoint', // reference the data source
 					'layout': {
 						'text-field': maincitycoords.displayname,
-						'text-font': ["Frutiger Bold"],
+						// Same stack the styles use. Mapbox serves a comma-separated
+						// stack by skipping fonts the account does not have, but a bare
+						// "Frutiger Bold" 404s outright and the label never draws.
+						'text-font': ["Frutiger Bold", "Arial Unicode MS Regular"],
 						'text-size': 28,
 						'text-line-height': 1.2,
 						'text-max-width': 10,
@@ -381,7 +390,10 @@ function initBasemaps() {
 					'source': 'maincitypoint', // reference the data source
 					'layout': {
 						'text-field': maincitycoords.displayname,
-						'text-font': ["Frutiger Bold"],
+						// Same stack the styles use. Mapbox serves a comma-separated
+						// stack by skipping fonts the account does not have, but a bare
+						// "Frutiger Bold" 404s outright and the label never draws.
+						'text-font': ["Frutiger Bold", "Arial Unicode MS Regular"],
 						'text-size': 28,
 						'text-line-height': 1.2,
 						'text-max-width': 10,
@@ -399,6 +411,11 @@ function initBasemaps() {
 	});
 
 }
+// How long a map surface takes to fade in or out. Matches the 500ms the slides
+// already use for their legends, and the delay they already waited before
+// advancing, so the map and the furniture around it move together.
+var MAP_FADE_MS = 500;
+
 function recenterMap(divID, lat, lon, zoom) {
 	if (divID == 'radar-1') {
 		radarmain.jumpTo({
@@ -415,82 +432,64 @@ function recenterMap(divID, lat, lon, zoom) {
 		});
 	}
 }
+/**
+ * Crossfade one of the map surfaces in or out.
+ *
+ * This used to fade a map by naming its layers: a hardcoded run of
+ * setPaintProperty calls took every border, highway, road sign and city label
+ * to opacity 0, and the containers were hidden 500ms later. Two things were
+ * wrong with that. The list could only ever name the layers the upstream style
+ * happened to have — MAPBOX_STYLE_* exists so a deployment can fork those
+ * styles, and a fork that adds or renames a layer is simply not in the list;
+ * the radar style's own `minor cities copy` and coastline were already missing
+ * from it, and the satellite branch never named its land background, water,
+ * hillshade, counties, highways or labels at all. And the base rasters
+ * underneath have no opacity for the list to set in the first place.
+ *
+ * Everything the list missed therefore stayed at full strength after the fade
+ * finished, so the last fifth of a second of every radar and satellite slide
+ * was a stripped-down map — terrain and a few stray labels, no weather, no
+ * borders — sitting there until the container was pulled out from under it. On
+ * the way in the same map appeared at full strength before anything faded up.
+ *
+ * Fading the container takes the whole stacked surface down as one image: base
+ * tiles, vector overlay and radar frames together, on any style, with no list
+ * to keep in sync. It also leaves each layer's own paint alone, so data-driven
+ * values like the Highways zoom ramp survive instead of being flattened to 1.
+ *
+ * The frame layers still differ per map — full strength on the raster-only
+ * surface, half on the labelled one so the labels read through — but that is a
+ * fixed level rather than a fade, so loadRadarImages() sets it once when it
+ * adds them.
+ */
 function fadeMap(divID, fadein, zoom) {
 	if (divID == 'radar-1') {
+		// stop() rather than letting the fades queue: a slide that is cut short
+		// would otherwise fade in only after the previous fade-out had finished
+		// playing out. false, so an interrupted fade resumes from where it is
+		// instead of snapping to its end first.
+		var doppler = $('#radar-1, #radar-2, #radar-3').stop(true, false)
 		if (fadein === true) {
-			$('#radar-1').fadeIn(0)
-			$('#radar-2').fadeIn(0)
-			$('#radar-3').fadeIn(0)
+			// fadeIn sets display before it starts tweening, so the containers are
+			// back in flow by the time resize() measures them. That order matters:
+			// both libraries fall back to 400x300 for a display:none element and
+			// then hold that size until something resizes them again.
+			doppler.fadeIn(MAP_FADE_MS)
 			map.resize()
 			basemap.resize()
 			radarmain.resize()
 		} else {
-			setTimeout(function() {
-				$('#radar-1').fadeOut(0)
-				$('#radar-2').fadeOut(0)
-				$('#radar-3').fadeOut(0)
-			}, 500)
-		}
-		map.setPaintProperty('counties blur','line-opacity', (fadein == true) ? 1 : 0)
-		map.setPaintProperty('counties','line-opacity', (fadein == true) ? 1 : 0)
-		map.setPaintProperty('country-boundaries blur','line-opacity', (fadein == true) ? 1 : 0)
-		map.setPaintProperty('country-boundaries','line-opacity', (fadein== true) ? 1 : 0)
-		map.setPaintProperty('state blur','line-opacity', (fadein== true) ? 1 : 0)
-		map.setPaintProperty('state','line-opacity', (fadein== true) ? 1 : 0)
-		map.setPaintProperty('state blur copy','line-opacity', (fadein== true) ? 1 : 0)
-		map.setPaintProperty('state copy','line-opacity', (fadein== true) ? 1 : 0)
-		map.setPaintProperty('Highways Outline','line-opacity', (fadein== true) ? 1 : 0)
-		map.setPaintProperty('Highways','line-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('roadsigns','text-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('roadsigns','icon-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('minor city shadows','text-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('minor cities','text-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('minor cities','icon-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('major city shadow','text-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('major cities','text-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('major cities','icon-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('airport-label medium','icon-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('airport-label large','icon-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('maincityshadow','text-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('maincity','text-opacity', (fadein== true) ? 1 : 0)
-			map.setPaintProperty('maincity','icon-opacity', (fadein== true) ? 1 : 0)
-		if (sortedtimestamps) {
-		sortedtimestamps.forEach((timestamp, index) => {
-			radarmain.setPaintProperty(
-					`radarlayer_${timestamp.ts}`,
-					"raster-opacity",
-						(fadein == true) ? 1 : 0
-			);
-			map.setPaintProperty(
-					`radarlayer_${timestamp.ts}`,
-					"raster-opacity",
-						(fadein == true) ? .5 : 0
-			);
-		});
+			// fadeOut hides the containers when the fade lands, which is the same
+			// 500ms mark a setTimeout used to hide them at.
+			doppler.fadeOut(MAP_FADE_MS)
 		}
 	} else if (divID == 'satrad-1') {
+		var satellite = $('#satrad-1').stop(true, false)
 		if (fadein === true) {
-			$('#satrad-1').fadeIn(0)
+			satellite.fadeIn(MAP_FADE_MS)
 			satellitemap.resize()
 		} else {
-			setTimeout(function() {
-				$('#satrad-1').fadeOut(0)
-			},500)
-		}
-		satellitemap.setPaintProperty('state blur','line-opacity', (fadein== true) ? 1 : 0)
-		satellitemap.setPaintProperty('state','line-opacity', (fadein== true) ? 1 : 0)
-		satellitemap.setPaintProperty('state blur copy','line-opacity', (fadein== true) ? 1 : 0)
-		satellitemap.setPaintProperty('state copy','line-opacity', (fadein== true) ? 1 : 0)
-		satellitemap.setPaintProperty('country-boundaries blur','line-opacity', (fadein == true) ? 1 : 0)
-		satellitemap.setPaintProperty('country-boundaries','line-opacity', (fadein== true) ? 1 : 0)
-		if (satradsortedtimestamps) {
-		satradsortedtimestamps.forEach((timestamp, index) => {
-			satellitemap.setPaintProperty(
-				`satradlayer_${timestamp.ts}`,
-				"raster-opacity",
-					(fadein == true) ? 1 : 0
-				);
-		});
+			satellite.fadeOut(MAP_FADE_MS)
 		}
 	} else if (divID == 'minimap') {
 		if (sortedtimestampsmini) {
@@ -509,9 +508,19 @@ function fadeMap(divID, fadein, zoom) {
 		}
 	}
 }
+/**
+ * Rebuild one surface's frame layers from the current series.
+ *
+ * Returns a promise that settles once the layers are actually on the map. The
+ * fetch behind them is asynchronous, so a caller that wants to raise their
+ * opacity or start animating has to wait for this rather than for the map to
+ * next go idle — an idle map fires that event immediately and the caller would
+ * act on layers that do not exist yet.
+ */
 function loadRadarImages(divID) {
 	var mapdiv;
 	var radardiv;
+	var pending = Promise.resolve();
 
 	if (divID == 'radar-1') {
 		if (interval) {clearInterval(interval)};
@@ -549,7 +558,7 @@ function loadRadarImages(divID) {
 			});
 		}
 		// Use RainViewer for satellite data
-		rainViewerConfig.getSatelliteSeries()
+		pending = rainViewerConfig.getSatelliteSeries()
 	    .then(data => {
 				sortedtimestampsforfetch = data.seriesInfo.satrad.series.sort(function(a,b) {
 					return a.ts - b.ts;
@@ -568,16 +577,28 @@ function loadRadarImages(divID) {
 	            maxzoom: rainViewerConfig.satelliteMaxZoom
 	          },
 	          layout: { visibility: "visible" },
-						paint: {'raster-fade-duration': .5, 'raster-opacity':0,'raster-brightness-max':1},
+						paint: {'raster-fade-duration': .5, 'raster-opacity':1,'raster-brightness-max':1},
 	          minzoom: 0,
 	          maxzoom: 8,
 	        });
 	    })
 			})
+			.catch(console.error);
 		}
 	if (divID != 'satrad-1') {
+	// How strongly the frames paint once they are up. The labelled map carries
+	// them at half so its roads and city names read through; the raster-only
+	// surface underneath carries them at full. fadeMap used to assign this on
+	// every fade, but the slide crossfade is now done on the container, so this
+	// is a level set once at add time.
+	//
+	// The minimap is the exception: it rebuilds its layers in place while it is
+	// on screen, and they are added visible, so it still needs them to come up
+	// dark and be raised by fadeMap('minimap', true) once the rebuild settles.
+	var frameOpacity = (divID == 'minimap') ? 0 : 1;
+	var labelledFrameOpacity = (divID == 'minimap') ? 0 : 0.5;
 	// Use RainViewer for radar data
-	rainViewerConfig.getRadarSeries()
+	pending = rainViewerConfig.getRadarSeries()
     .then(data => {
 			sortedtimestampsforfetch = data.seriesInfo.twcRadarMosaic.series.sort(function(a,b) {
 				return a.ts - b.ts;
@@ -596,7 +617,7 @@ function loadRadarImages(divID) {
             maxzoom: rainViewerConfig.radarMaxZoom
           },
           layout: { visibility: "visible" },
-					paint: {'raster-fade-duration': .5, 'raster-opacity':0,'raster-brightness-max':0.9},
+					paint: {'raster-fade-duration': .5, 'raster-opacity':frameOpacity,'raster-brightness-max':0.9},
           minzoom: 5,
           maxzoom: 8
         });
@@ -612,7 +633,7 @@ function loadRadarImages(divID) {
             maxzoom: rainViewerConfig.radarMaxZoom
           },
           layout: { visibility: "visible" },
-					paint: {'raster-fade-duration': .5,'raster-opacity':0,'raster-brightness-max':0.9},
+					paint: {'raster-fade-duration': .5,'raster-opacity':labelledFrameOpacity,'raster-brightness-max':0.9},
           minzoom: 5,
           maxzoom: 12
         });
@@ -620,7 +641,37 @@ function loadRadarImages(divID) {
     })
     .catch(console.error);
 		}
+	return pending;
 }
+// One loop is a frame every RADAR_FRAME_MS, then a pause on the last frame
+// before the next pass starts. Both loops below tick on these, and
+// radarLoopCount() budgets against them, so the three cannot drift apart.
+var RADAR_FRAME_MS = 100;
+var RADAR_LOOP_PAUSE_MS = 500;
+
+/**
+ * How many passes of the loop fit inside a slide.
+ *
+ * The slides used to work this out as `slideDelay * 11/60000`, which assumes a
+ * pass takes 60000/11 — about 5.5 seconds. A pass actually takes one frame
+ * interval per frame plus the pause, so 1.8s for RainViewer's thirteen radar
+ * frames and 1.4s for GIBS's nine. A ten-second slide therefore asked for two
+ * passes, animated for under four seconds and then sat frozen on the newest
+ * frame for the remaining six; the sixty-second LOCAL RADAR tab asked for
+ * eleven and froze for forty. Neither frame count is fixed either — RainViewer
+ * adds and drops nowcast frames — so the number has to be measured, not
+ * assumed.
+ *
+ * Floor rather than round: the last pass should finish inside the slide, not
+ * get cut off partway by the transition.
+ */
+function radarLoopCount(divID, slideDuration) {
+	var frames = (divID == 'satrad-1') ? satradsortedtimestamps : sortedtimestamps;
+	var count = (frames && frames.length) ? frames.length : 13;
+	var loopMs = count * RADAR_FRAME_MS + RADAR_LOOP_PAUSE_MS;
+	return Math.max(1, Math.floor(slideDuration / loopMs));
+}
+
 /**
  * Show one frame of a radar loop.
  *
@@ -691,7 +742,7 @@ function animateRadar(divID, loopnum, maxloop) {
 					animateRadar('radar-1', loopnum + 1, maxloop)
 				}
 				return;
-			},500)
+			},RADAR_LOOP_PAUSE_MS)
     } else {
 			var prefix = (divID == 'satrad-1') ? 'satradlayer_' : 'radarlayer_';
 			showRadarFrame([radardiv], sortedmaptimestamps, prefix, i, i - 1);
@@ -700,7 +751,7 @@ function animateRadar(divID, loopnum, maxloop) {
 			}
       i += 1;
     }
-  }, 100);
+  }, RADAR_FRAME_MS);
 }
 function animateMiniRadar() {
 	let i = 0;
@@ -718,12 +769,12 @@ function animateMiniRadar() {
 			setTimeout(function() {
 				animateMiniRadar()
 				return;
-			},500)
+			},RADAR_LOOP_PAUSE_MS)
     } else {
 			showRadarFrame([miniradar, minimap], sortedtimestampsmini, 'radarlayer_', i, i - 1);
       i += 1;
     }
-  }, 100);
+  }, RADAR_FRAME_MS);
 }
 
 // The Leaflet-based Radar() implementation that used to sit here was already

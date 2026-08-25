@@ -4860,23 +4860,33 @@ label{
 .mapcon {
   flex: 1;
 }
+/* The four map surfaces stack in one container and only ever one set is on
+   screen: #radar-1/2/3 for the doppler slide, #satrad-1 for the satellite one.
+   fadeMap() shows and hides them, but it only runs from each map's own load
+   handler, so until then they were all visible at once and #satrad-1 — last in
+   the DOM, and a far wider view — painted over the doppler stack. Starting
+   hidden means the first slide of a session looks like every later one. */
 #radar-1 {
   position: absolute;
+  display: none;
   width: 884.5px;
   height: 460.8px;
 }
 #radar-2 {
   position: absolute;
+  display: none;
   width: 884.5px;
   height: 460.8px;
 }
 #radar-3 {
   position: absolute;
+  display: none;
   width: 884.5px;
   height: 460.8px;
 }
 #satrad-1 {
   position: absolute;
+  display: none;
   width: 884.5px;
   height: 460.8px;
 }
