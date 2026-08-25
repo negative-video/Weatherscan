@@ -93,7 +93,70 @@ than a reconstructed timestamp URL, which serves degraded tiles.
 **Frontend bugs fixed in place.** Three unbounded scan loops that ran past the
 end of the forecast array and hung the browser tab. An off-by-one plus an
 inverted failure guard in the nearby-cities scan. Null-row guards in six slide
-parsers. San Francisco's longitude was missing its minus sign.
+parsers. San Francisco's longitude was missing its minus sign. Per-slide delay
+overrides read `slidedelay` from a JSON blob that spells it `slideDelay`, so
+every slide silently ran at its tab's delay and the feature had never worked.
+
+**The radar slides.** These are the centrepiece of the loop and every one of
+them was visibly wrong in a different way.
+
+*The loop froze partway through.* How many passes to play was worked out as
+`slideDelay * 11/60000` — a constant that assumes a pass takes about five and a
+half seconds. A pass actually takes one frame interval per frame plus the pause
+between passes: 1.8s for RainViewer's thirteen frames. So a ten-second slide
+asked for two passes, animated for under four seconds and then sat frozen on the
+newest frame for the remaining six; the sixty-second LOCAL RADAR tab asked for
+eleven and froze for forty. It is measured from the actual frame count now,
+which also means it adapts on its own as that count changes.
+
+*Every slide ended on a stripped-down map.* Fading a map out was a hardcoded run
+of `setPaintProperty` calls naming each border, highway, road sign and city
+label, with the containers hidden 500 ms later. The list could only ever name
+the layers the upstream style happened to have — the radar style's own
+`minor cities copy` and coastline were already missing from it, and the
+satellite branch never named its land background, water, hillshade, counties,
+highways or labels at all. The base rasters underneath have no opacity for such
+a list to set in the first place. Everything it missed stayed at full strength
+after the fade finished, so the last fifth of a second of every radar and
+satellite slide was bare terrain with a few stray labels and no weather on it.
+The containers are faded as one surface now, which works on any style, has no
+list to keep in sync, and stops flattening the style's own data-driven values
+like the Highways zoom ramp.
+
+*The first slide of a session showed the wrong map.* The four map surfaces stack
+in one container and have no `display` in the stylesheet, so until each map's
+load handler fired they were all visible at once — and the satellite surface,
+last in the DOM and a far wider view, painted over the doppler stack.
+
+*The mini radar never refreshed.* The five-minute observation refresh hangs its
+rebuild on `minimap.on('load')`, and `load` fires once per map. The first call
+worked and every later one registered a handler that could not run, so the mini
+radar looped whatever frames were fetched at startup for as long as the display
+stayed up, accumulating a dead closure every five minutes. Behind that sat a
+second bug the first one was hiding: the rebuild was sequenced on the map's next
+`idle`, but the layers are added after an asynchronous fetch, and a map that has
+been sitting on screen is already idle. It only held together at startup because
+a freshly loaded map stays busy with tiles for a second or two.
+
+*The sim's own city label was missing.* Four layers added from JavaScript asked
+for a bare `["Frutiger Bold"]` where the styles ask for
+`["Frutiger Bold", "Arial Unicode MS Regular"]`. Mapbox 404s a lone font its
+account does not have, but serves a comma-separated stack by skipping the
+members it lacks — so the styles rendered and the locator dot and city name did
+not.
+
+**The radar legends tell the truth now.** The local Doppler slide claims "Past 3
+Hours" and the regional satellite claims "Past 5 Hours"; they were showing two
+hours and one and a half. Satellite was only a matter of asking NASA GIBS for
+more of its archive — sixteen slots on a twenty-minute step rather than twelve
+on a ten-minute one, which spans five hours without making the loop twice as
+long. Radar is harder: RainViewer's free listing is capped at two hours with no
+parameter for more. Its tilecache keeps serving a frame long after it drops off
+that listing, though — a path captured three and a half hours earlier still
+returns real imagery at every zoom — so the backend keeps a rolling three-hour
+buffer of frames it has seen and serves the union. Frames older than the current
+listing are checked before being served, so an expiry shortens the loop instead
+of blanking frames.
 
 **No CDN scripts at boot.** jQuery, the marquee plugin, mapbox-gl and
 maplibre-gl were pulled from googleapis, jsdelivr and unpkg on every page load,
@@ -156,8 +219,8 @@ local run, `npm run split-icons`. The server detects whether they exist and the
 frontend falls back to the sheets if they do not.
 
 **The radar loops did twenty-six style writes to change two layers.** Both loops
-walked the whole thirteen-frame timestamp list on every 100 ms tick and set
-`visibility` on every frame of both maps. They now touch only the frame going
+walked the whole timestamp list — thirteen frames at the time — on every 100 ms
+tick and set `visibility` on every frame of both maps. They now touch only the frame going
 out and the frame coming in. A related bug: each tick called `clearInterval` on
 a shared global rather than on its own handle, so two overlapping loops would
 orphan a 10 Hz timer driving two WebGL maps for the life of the page — which is
@@ -348,7 +411,7 @@ The backend serves the frontend and a JSON API on one port.
 | `GET /api/status` | Provider health, cache stats, HA connection and entity list |
 | `GET /api/healthz` | Liveness probe |
 | `GET /api/weather?lat=&lon=` | Normalized weather bundle |
-| `GET /api/radar/series` | Radar and satellite frames with tile templates |
+| `GET /api/radar/series` | Radar and satellite frames with tile templates — three hours of radar, five of satellite |
 | `GET /api/almanac?lat=&lon=` | 30-year normals and records |
 | `GET /api/marquee` | Ticker headlines |
 | `GET /api/moon` | Next four moon phases |
@@ -418,6 +481,25 @@ tests.
   `MAPBOX_STYLE_*` lines to paste into `.env`. The write token is separate from
   `MAPBOX_API_KEY` and must never go in `.env` — see
   [scripts/fork-mapbox-styles.js](scripts/fork-mapbox-styles.js).
+- **Forked styles fall back to Arial until you upload the fonts.** The styles
+  ask for `Frutiger Bold` and `Interstate Regular`, which live in the original
+  author's Mapbox account, not yours. Every label still renders, because each
+  font is paired with `Arial Unicode MS Regular` and Mapbox serves a
+  comma-separated stack by skipping members it lacks — it just renders in the
+  wrong typeface, silently. Upload `webroot/fonts/FrutigerBold.ttf` through the
+  Fonts item inside the Studio style editor (it is not a top-level page) and
+  every style picks it up with no code change. Mapbox names an upload from the
+  font's internal name table rather than its filename, so of the several
+  Frutiger files in that folder only `FrutigerBold.ttf` resolves to the name the
+  styles ask for. There is no Interstate Regular in an uploadable `.ttf`/`.otf`
+  in this repo — only `.woff`, which Mapbox does not accept.
+- **Three hours of radar takes an hour to build up.** RainViewer's free listing
+  covers two hours, and its frame paths are opaque hashes rather than anything
+  derivable from a timestamp, so the backend's rolling buffer can only hold
+  frames it has actually observed. A cold start serves the two hours RainViewer
+  lists and reaches the full window after about an hour of polling. Frames
+  outliving the listing is observed behaviour, not a documented guarantee, which
+  is why they are checked before being served.
 - **Pollen needs a key in the US.** The free CAMS pollen data is Europe-only.
 - **The aches and breathing indices are derived.** They were proprietary Weather
   Channel products with no free equivalent, so they are computed from the
