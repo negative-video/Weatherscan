@@ -1603,7 +1603,15 @@ var mainMap
 		if (moveHeader > 0) advanceHeader(moveHeader)
 		var preloadIdx = parseInt(idx) + 1, divTestNext = divTest, keysNext = keys, moveHeaderPreload = 0;
 		location = divTest.dataset.locidx
-		slideDelay = (keys[idx].slidedelay != undefined) ? parseInt(keys[idx].slidedelay) : parseInt(divTest.dataset.slidedelay)
+		// Per-slide overrides come back out of the data attribute as JSON with
+		// their original casing, so looking for `slidedelay` never found one and
+		// every slide silently ran at its tab's delay. Reading the right key is
+		// not enough on its own: config.js leaves the field as "" on slides that
+		// do not override, parseInt("") is NaN, and setTimeout treats NaN as 0 —
+		// which would fire every slide instantly. Fall back unless the override
+		// parses to a real number.
+		var slideDelayOverride = parseInt(keys[idx].slideDelay)
+		slideDelay = isNaN(slideDelayOverride) ? parseInt(divTest.dataset.slidedelay) : slideDelayOverride
 		function grabPreloadDiv() {
 			if (preloadIdx >= keysNext.length) {
 				preloadIdx = 0
