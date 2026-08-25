@@ -123,6 +123,21 @@ The containers are faded as one surface now, which works on any style, has no
 list to keep in sync, and stops flattening the style's own data-driven values
 like the Highways zoom ramp.
 
+*Only one frame of the loop ever drew across the whole map.* Stepping the loop
+toggled each frame layer's `visibility`, and a source is kept alive only while
+some layer using it is not hidden — both libraries decide that from
+`visibility` and the zoom range, never from opacity. Hiding a frame therefore
+dropped its source, and dropping a source evicts its tiles. Measured mid-loop,
+the one visible frame held its two tiles and all twelve others held zero: every
+frame was re-fetching from nothing during the 100 ms it was on screen, so
+whichever tile arrived first drew and the rest of the map stayed empty. Only the
+frame the loop rested on had time to finish, which is why the newest frame
+looked complete and the others were missing their left and right edges. The loop
+moves `raster-opacity` now. Both libraries return early from the raster draw at
+opacity 0, so a frame that is not showing still costs nothing to render, but its
+source stays used and its tiles stay resident — every frame is fully loaded
+before the loop reaches it.
+
 *The first slide of a session showed the wrong map.* The four map surfaces stack
 in one container and have no `display` in the stylesheet, so until each map's
 load handler fired they were all visible at once — and the satellite surface,
@@ -220,8 +235,10 @@ frontend falls back to the sheets if they do not.
 
 **The radar loops did twenty-six style writes to change two layers.** Both loops
 walked the whole timestamp list — thirteen frames at the time — on every 100 ms
-tick and set `visibility` on every frame of both maps. They now touch only the frame going
-out and the frame coming in. A related bug: each tick called `clearInterval` on
+tick and set `visibility` on every frame of both maps. They now touch only the
+frame going out and the frame coming in, and move `raster-opacity` rather than
+`visibility` — see [above](#what-changed) for why that second part matters more
+than the first. A related bug: each tick called `clearInterval` on
 a shared global rather than on its own handle, so two overlapping loops would
 orphan a 10 Hz timer driving two WebGL maps for the life of the page — which is
 the sort of thing you only notice on day three.
