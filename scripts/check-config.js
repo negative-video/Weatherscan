@@ -192,6 +192,35 @@ const TEST_LON = -78.4767;
     }
   }
 
+  // --- the file people actually edit ---
+  //
+  // config.js is wired to the rest of the frontend through string keys, and
+  // every way of getting one wrong fails silently on screen: a mistyped slide
+  // name renders nothing, a placeholder with no substitution prints itself,
+  // a testDisplay that throws takes its slide down. None of that is visible
+  // until the loop reaches the slide, which can be minutes after startup.
+  //
+  // Shared with test/slides.test.js so `npm run check` and `npm test` cannot
+  // disagree about what a valid config is. Both are host-side tools; neither
+  // ships in the image.
+  try {
+    const { validateSlideConfig } = require('../test/helpers/frontend');
+    const found = validateSlideConfig();
+    if (found.all.length) {
+      line('fail', 'config.js', `${found.all.length} problem(s):`);
+      for (const problem of found.all) console.log(`       ${DIM}${problem}${RESET}`);
+    } else {
+      line('ok', 'config.js', 'slides, containers, headers and skip tests all resolve');
+    }
+  } catch (err) {
+    // A missing test/ directory is normal for a trimmed deployment.
+    if (err.code === 'MODULE_NOT_FOUND') {
+      line('warn', 'config.js', 'not checked (test/ not present in this copy)');
+    } else {
+      line('fail', 'config.js', err.message);
+    }
+  }
+
   console.log('');
   console.log('='.repeat(64));
   if (problems.length) {
