@@ -1,5 +1,7 @@
 'use strict';
 
+const { AsyncLocalStorage } = require('node:async_hooks');
+
 /**
  * TTL cache with in-flight de-duplication and stale-on-error fallback.
  *
@@ -9,6 +11,26 @@
  *   - If a refresh fails, the last good value keeps the screen populated
  *     rather than blanking the slide.
  */
+
+/**
+ * The chain of keys whose producers the current async context is inside.
+ *
+ * In-flight de-duplication is the whole point of this cache and also its one
+ * sharp edge: handing a second caller the promise a first is still producing
+ * is right, unless that second caller *is* the first, reached by recursion.
+ * Then the producer awaits itself, and it does not merely fail — it never
+ * settles, the finally that clears the in-flight entry never runs, and every
+ * later caller for that key is handed the same dead promise for the life of
+ * the process.
+ *
+ * That is not hypothetical: geocode.reverse() fell back through nearby(),
+ * which opens by awaiting reverse() for the same point, and one failed web
+ * lookup wedged /v3/location/near until the server was restarted.
+ *
+ * AsyncLocalStorage tracks the keys this particular chain is producing, which
+ * distinguishes a real second caller from a re-entrant one.
+ */
+const producing = new AsyncLocalStorage();
 class Cache {
   constructor({ maxEntries = 500 } = {}) {
     this.store = new Map();
@@ -36,15 +58,27 @@ class Cache {
       return entry.value;
     }
 
+    // A cycle, not a second caller. Throwing loses this one lookup; awaiting
+    // would lose the key permanently.
+    const chain = producing.getStore();
+    if (chain && chain.includes(key)) {
+      throw new Error(
+        `cache: producer for "${key}" re-entered its own key ` +
+        `(${chain.join(' -> ')} -> ${key}). Awaiting it would deadlock the key ` +
+        'for the life of the process; break the cycle instead.'
+      );
+    }
+
     const pending = this.inflight.get(key);
     if (pending) return pending;
 
     this.misses++;
     const staleMs = opts.staleMs != null ? opts.staleMs : ttlMs * 6;
 
+    const nested = chain ? [...chain, key] : [key];
     const promise = (async () => {
       try {
-        const value = await producer();
+        const value = await producing.run(nested, producer);
         this.set(key, value);
         return value;
       } catch (err) {
