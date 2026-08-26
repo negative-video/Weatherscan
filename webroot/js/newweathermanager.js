@@ -22,21 +22,29 @@ function spinything() {
     rotatex = perlin.get(startxx, startxy)*2
     rotatey = perlin.get(startyx, startyy)*2
     rotatez = perlin.get(startzx, startzy)*2
-  $(".intellistarlogo").css( {transition:'transform 2s linear', transform: `rotatex(${rotatex}turn) rotatey(${rotatey}turn) rotatez(${rotatez}turn)`});
+  var $logo = $(".intellistarlogo");
+  $logo.css({transition: 'transform 2s linear', transform: `rotatex(${rotatex}turn) rotatey(${rotatey}turn) rotatez(${rotatez}turn)`});
   var rotinterval;
   setTimeout(function() {
+    // The transition is set once. It used to be rewritten on every tick along
+    // with the transform, which restarts a one-second transition ten times a
+    // second on a 3D-transformed element for the rest of the intro — style
+    // recalc that overlapped the boot work landing behind the card. The wander
+    // looks the same: only the target moves.
+    $logo.css('transition', 'transform 1s linear');
     rotinterval = setInterval(function(){
       time = time + .005;
-      //animationtime = Math.floor(Math.random() * (12 - 3 + 1)) + 3
       rotatex = perlin.get(startxx + time, startxy + time)*2
       rotatey = perlin.get(startyx + time, startyy + time)*2
       rotatez = perlin.get(startzx + time, startzy + time)*2
-      $(".intellistarlogo").css( {transition:'transform 1s linear', transform: `rotatex(${rotatex}turn) rotatey(${rotatey}turn) rotatez(${rotatez}turn)`});
+      $logo.css('transform', `rotatex(${rotatex}turn) rotatey(${rotatey}turn) rotatez(${rotatez}turn)`);
     }, 100);
   },1000)
   setTimeout(function () {
     clearInterval(rotinterval)
     $("#startup").fadeOut(0);
+    // The display is on screen from here. The slide rotation starts with it.
+    bootRevealed.reach();
   }, 5000)
 
   };
@@ -81,6 +89,40 @@ setInterval(
 var maincitycoords = {name:"",lat:"",lon:"",displayname:""}, marinelocation,
 locList = [], citySlideList = [], state, ccTickerCitiesList = [];
 
+/**
+ * A one-shot boot milestone. `reach()` is Promise resolve, so signalling twice
+ * is harmless and callers registered after the fact still run.
+ */
+function bootStage() {
+  var resolve;
+  var stage = new Promise(function (res) { resolve = res; });
+  stage.reach = resolve;
+  return stage;
+}
+var bootDataReady = bootStage();
+var bootRevealed = bootStage();
+
+// Backstop. If nothing ever lands the display still comes up, in the same
+// degraded state the old fixed timer produced.
+setTimeout(bootDataReady.reach, 4000);
+
+/**
+ * Everything that needs the main location.
+ *
+ * All four branches of getMainLoc ended with these same four calls written out
+ * again; only the expression assigned to `state` differed between them.
+ *
+ * Boot is not signalled here. Resolving the location only starts these
+ * fetches -- grabSideandLowerBarData reaches the milestone when its data has
+ * actually landed. See the comment there.
+ */
+function onMainLocationResolved() {
+  getStatePopularCities(state, true)
+  grabalmanacSlidesData()
+  grabHealthData()
+  grabSideandLowerBarData()
+}
+
 
   //If there is a location inputted, use that.
 //$.getJSON("http://"+document.location.hostname+":8081/https://services.surfline.com/forecasts/wave?spotId=500927576a2e4300134fbed8", function() {});
@@ -116,11 +158,7 @@ function getMainLoc(configFailed) {
       $("#locationname").text("location name: "+data.location.displayName[0])
       maincitycoords.displayname = data.location.displayName[0]
       state = data.location.adminDistrict[0];
-      //init data
-      getStatePopularCities(state, true)
-      grabalmanacSlidesData()
-      grabHealthData()
-      grabSideandLowerBarData()
+      onMainLocationResolved()
     }).fail(function () { onMainLocFailed(configFailed); });
   } else if (locationSettings.mainLocation.searchQuery.type && configFailed != true) {
     if (locationSettings.mainLocation.searchQuery.type == "geocode") {
@@ -131,16 +169,18 @@ function getMainLoc(configFailed) {
         maincitycoords.name = data.location.displayName
         maincitycoords.displayname = ((locationSettings.mainLocation.displayName) ? locationSettings.mainLocation.displayName : data.location.displayName)
         $("#locationname").text("location name: "+maincitycoords.displayname)
-        state = data.location.adminDistrict[cidx];
+        // A point response is scalar throughout -- every field beside this one
+        // is read without an index. Subscripting the state name returned
+        // undefined (cidx is only ever assigned by the search branch below, and
+        // is undefined until it runs), so a configured geocode location looked
+        // up its ticker cities for no state at all.
+        state = data.location.adminDistrict;
 
-        getStatePopularCities(state, true)
-        grabalmanacSlidesData()
-        grabHealthData()
-        grabSideandLowerBarData()
+        onMainLocationResolved()
       }).fail(function () { onMainLocFailed(configFailed); });
     } else {
       $.getJSON("https://api.weather.com/v3/location/search?query="+locationSettings.mainLocation.searchQuery.val+"&locationType="+locationSettings.mainLocation.searchQuery.type+"&fuzzyMatch="+locationSettings.mainLocation.searchQuery.fuzzy+((locationSettings.mainLocation.searchQuery.country) ? "&countryCode="+locationSettings.mainLocation.searchQuery.country : "")+((locationSettings.mainLocation.searchQuery.state) ? "&adminDistrictCode="+locationSettings.mainLocation.searchQuery.state : "")+"&language=en-US&format=json&apiKey=" + api_key, function(data) {
-          cidx = ((locationSettings.mainLocation.searchQuery.searchResultNum && locationSettings.mainLocation.searchQuery.searchResultNum < data.location.placeId.length) ? locationSettings.mainLocation.searchQuery.searchResultNum : 0)
+          var cidx = ((locationSettings.mainLocation.searchQuery.searchResultNum && locationSettings.mainLocation.searchQuery.searchResultNum < data.location.placeId.length) ? locationSettings.mainLocation.searchQuery.searchResultNum : 0)
           getExtraLocs(data.location.latitude[cidx],data.location.longitude[cidx],true);
           maincitycoords.lat = data.location.latitude[cidx]
           maincitycoords.lon = data.location.longitude[cidx]
@@ -149,10 +189,7 @@ function getMainLoc(configFailed) {
           $("#locationname").text("location name: "+maincitycoords.displayname)
           state = data.location.adminDistrict[cidx];
 
-          getStatePopularCities(state, true)
-          grabalmanacSlidesData()
-          grabHealthData()
-          grabSideandLowerBarData()
+          onMainLocationResolved()
       }).fail(function () { onMainLocFailed(configFailed); });
     }
   } else {
@@ -165,11 +202,7 @@ function getMainLoc(configFailed) {
       maincitycoords.lat = data.lat
       maincitycoords.lon = data.lon
       state = data.regionName
-      //init data
-      getStatePopularCities(state, true)
-      grabalmanacSlidesData()
-      grabHealthData()
-      grabSideandLowerBarData()
+      onMainLocationResolved()
     }).fail(function () { onMainLocFailed(configFailed); });
 
   }
@@ -270,7 +303,7 @@ function getExtraLocs(lat,lon, onInit, whichReset) {
               }).fail(function(){if (i < locationSettings.extraLocations.locs.length-1) {addConfigLocsLoop(i + 1)} else {sortFinishedLocList()}});
             } else {
               $.getJSON("https://api.weather.com/v3/location/search?query="+eloc.searchQuery.val+"&locationType="+eloc.searchQuery.type+"&fuzzyMatch="+eloc.searchQuery.fuzzy+((eloc.searchQuery.country) ? "&countryCode="+eloc.searchQuery.country : "")+((eloc.searchQuery.state) ? "&adminDistrictCode="+eloc.searchQuery.state : "")+"&language=en-US&format=json&apiKey=" + api_key, function(data) {
-                  cidx = ((eloc.searchQuery.searchResultNum && eloc.searchQuery.searchResultNum < data.location.placeId.length) ? eloc.searchQuery.searchResultNum : 0)
+                  var cidx = ((eloc.searchQuery.searchResultNum && eloc.searchQuery.searchResultNum < data.location.placeId.length) ? eloc.searchQuery.searchResultNum : 0)
                   locList.push({lat: data.location.latitude[cidx], lon:data.location.longitude[cidx], orderNum: ((eloc.orderNum) ? eloc.orderNum : i), distance:null, stationUrl:null, name:data.location.displayName[cidx], displayname:((eloc.displayName) ? eloc.displayName : data.location.displayName[cidx])});
                   if (i < locationSettings.extraLocations.locs.length-1) {addConfigLocsLoop(i + 1)} else {sortFinishedLocList()}
               }).fail(function(){if (i < locationSettings.extraLocations.locs.length-1) {addConfigLocsLoop(i + 1)} else {sortFinishedLocList()}});
@@ -288,7 +321,7 @@ function getExtraLocs(lat,lon, onInit, whichReset) {
               }).fail(function(){if (i < locationSettings.aroundCityInfoLocs.locs.length-1) {addConfigAroundLocsLoop(i + 1)} else {sortFinishedAroundLocList()}});
             } else {
               $.getJSON("https://api.weather.com/v3/location/search?query="+eloc.searchQuery.val+"&locationType="+eloc.searchQuery.type+"&fuzzyMatch="+eloc.searchQuery.fuzzy+((eloc.searchQuery.country) ? "&countryCode="+eloc.searchQuery.country : "")+((eloc.searchQuery.state) ? "&adminDistrictCode="+eloc.searchQuery.state : "")+"&language=en-US&format=json&apiKey=" + api_key, function(data) {
-                  cidx = ((eloc.searchQuery.searchResultNum && eloc.searchQuery.searchResultNum < data.location.placeId.length) ? eloc.searchQuery.searchResultNum : 0)
+                  var cidx = ((eloc.searchQuery.searchResultNum && eloc.searchQuery.searchResultNum < data.location.placeId.length) ? eloc.searchQuery.searchResultNum : 0)
                   citySlideList.push({lat: data.location.latitude[cidx], lon:data.location.longitude[cidx], orderNum: ((eloc.orderNum) ? eloc.orderNum : i), distance:null, stationUrl:null, name:data.location.displayName[cidx], displayname:((eloc.displayName) ? eloc.displayName : data.location.displayName[cidx])});
                   if (i < locationSettings.aroundCityInfoLocs.locs.length-1) {addConfigAroundLocsLoop(i + 1)} else {sortFinishedAroundLocList()}
               }).fail(function(){if (i < locationSettings.aroundCityInfoLocs.locs.length-1) {addConfigAroundLocsLoop(i + 1)} else {sortFinishedAroundLocList()}});
@@ -920,6 +953,13 @@ function grabSideandLowerBarData() {
               }
     };
   }
+  // The sidebar and lower bar have something to paint from here, which is what
+  // boot is really waiting for. Loops() reads these values once at construction
+  // and then not again for five minutes, so starting it on the location alone
+  // -- which resolves before this request has even been answered -- left the
+  // temperature and the conditions icon blank on screen until that refresh came
+  // round. Later calls from the refresh interval are a harmless no-op.
+  bootDataReady.reach();
   }).fail(function() {
     weatherInfo.currentCond.sidebar.displayname = maincitycoords.displayname
     weatherInfo.currentCond.sidebar.noReport = true
@@ -929,6 +969,8 @@ function grabSideandLowerBarData() {
     weatherInfo.dayDesc.lowerbar.noReport = true
     weatherInfo.fiveDay.lowerbar.displayname = maincitycoords.displayname
     weatherInfo.fiveDay.lowerbar.noReport = true
+    // A no-report sidebar is still a display worth putting on screen.
+    bootDataReady.reach();
   });
 }
 function grabalmanacSlidesData() {
@@ -1280,20 +1322,87 @@ setInterval(function(){
   pullCCTickerData();
 }, 300000)
 
-//init 1 second before intro stops
+/**
+ * Boot runs on readiness now, not on a stopwatch.
+ *
+ * Everything used to start from a bare setTimeout(4000) — "init 1 second before
+ * intro stops" — so seven map instances, the slide engine, the sidebar loops
+ * and the ticker manager all landed in the same moment the intro card lifts and
+ * the display becomes visible. That is the worst possible moment for it: the
+ * ticker is scrolling in front of the viewer by then, and it is the first thing
+ * a blocked main thread shows.
+ *
+ * It was also wrong on its own terms. The maps centre on maincitycoords, and
+ * nothing tied that timer to the location lookup having landed — a slow or
+ * retrying lookup built every map around empty coordinates.
+ *
+ * The intro runs five seconds and the location resolves in well under one, so
+ * there are four idle seconds behind the card with nothing on screen but a
+ * spinning logo. The warmup goes there. Only the slide rotation waits for the
+ * reveal, so the first slide a viewer sees starts at its first frame instead of
+ * being a second old already.
+ */
 var loops, slides;
-setTimeout(function() {
-  initBasemaps()
-  map.on('load', function() {
-    loadRadarImages('radar-1')
-  });
-  satellitemap.on('load', function() {
-    loadRadarImages('satrad-1')
-  });
+
+// Warmup, behind the intro card, while nothing the viewer can see is moving.
+bootDataReady.then(function () {
+  initSidebarBasemaps();
   loops = new Loops();
-  slides = new Slides();
   MarqueeMan();
-}, 4000)
+  preloadRevealAssets();
+});
+
+// How long after the reveal to leave the display alone before building the
+// four surfaces nobody is looking at yet. The first radar slide is around
+// forty seconds into the loop -- an intro, current conditions and the city
+// panel ahead of it -- so this has room to spare, and the radar slides build
+// them on demand if it somehow does not.
+//
+// The settle is the point. requestIdleCallback on its own fired 450ms after the
+// reveal, because the browser genuinely was idle then; measured, that put four
+// WebGL contexts and their style downloads squarely into the moment this whole
+// change exists to keep clear.
+var SLIDE_MAP_SETTLE_MS = 12000;
+
+bootRevealed.then(function () {
+  slides = new Slides();
+  setTimeout(function () { whenIdle(initSlideBasemaps, 10000); }, SLIDE_MAP_SETTLE_MS);
+});
+
+/**
+ * Run fn at the next idle moment, and no later than `timeout`.
+ *
+ * The hard timer is set even where requestIdleCallback exists, rather than as
+ * a fallback for where it does not: a display parked in a background tab may
+ * be given no idle callbacks at all, and these surfaces have to exist before
+ * the first radar slide either way. fn is idempotent, so whichever fires first
+ * wins and the other is a no-op.
+ */
+function whenIdle(fn, timeout) {
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(fn, {timeout: timeout});
+  setTimeout(fn, timeout);
+}
+
+/**
+ * Fetch what the first slides paint before they are asked to paint it.
+ *
+ * The city background is a 300–400KB PNG assigned to a container that is
+ * display:none until its slide shows, so the browser does not request it until
+ * the first transition — measured, it landed about a second and a half after
+ * the reveal and decoded over the top of the slide that wanted it. Behind the
+ * intro card both the network and the image decoder are idle, so this is free.
+ */
+function preloadRevealAssets() {
+  var theme = apperanceSettings.corebackgroud;
+  var known = ['forest', 'ocean', 'mountain', 'city', 'neighborhood', 'southwest'];
+  var core = (known.indexOf(theme) === -1) ? '/images/newbg/core_bg.png'
+    : '/images/newbg/core_' + theme + '_bg.png';
+  [core, '/images/newbg/map_banner_bg.png'].forEach(function (url) {
+    var img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+  });
+}
 
 function simulateReboot() {
   weatherInfo.reboot = true

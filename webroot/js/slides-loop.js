@@ -231,9 +231,15 @@ var mainMap
 		var header = '#slides-header', severepreload = false, tipidx = 0;
 
 		buildHeader();
+		// The first slide starts with the reveal rather than two seconds after
+		// being constructed. The rotation used to be built a second before the
+		// intro card lifted and then wait, so a viewer got the display with its
+		// header and sidebar up and nothing in the middle of it, and the slide
+		// that finally arrived was already a second into its own fade. Yielding
+		// one turn lets the reveal paint first.
 		setTimeout(function() {
 			showSlides(0)
-		}, 2000);
+		}, 0);
 		// loop cities
 		function transitionSevereWeatherMode(enterexit) {
 			if (enterexit == 'enter') {
