@@ -198,3 +198,104 @@ test('the pollen bars read their own index', () => {
   assert.ok(/pollentypes\.forEach\(function \(pollentype, i\)/.test(slidesLoop),
     'the bar index must come from forEach, not from a variable outside the loop');
 });
+
+// --- boot sequencing --------------------------------------------------------
+
+/**
+ * The boot order is load-bearing for how the display *feels*, and every part of
+ * it is easy to undo by accident, so the shape is asserted here.
+ *
+ * Seven map surfaces used to be built in one call on a bare setTimeout(4000) —
+ * one second before the intro card lifts. Measured, that put an 88ms task
+ * immediately before the reveal and a 56ms one immediately after it, which is
+ * exactly when the ticker becomes visible and has to be smooth.
+ */
+const radar = fe.source('radar.js');
+const manager = fe.source('newweathermanager.js');
+
+test('the sidebar and slide map surfaces are built separately', () => {
+  assert.ok(/function initSidebarBasemaps\(\)/.test(radar));
+  assert.ok(/function initSlideBasemaps\(\)/.test(radar));
+  assert.ok(!/function initBasemaps\(\)/.test(radar),
+    'the single seven-map constructor is back; boot pays for all of them again');
+
+  // Three in the sidebar, four for the radar and satellite slides.
+  const sidebar = radar.slice(radar.indexOf('function initSidebarBasemaps'),
+    radar.indexOf('function initSlideBasemaps'));
+  const slide = radar.slice(radar.indexOf('function initSlideBasemaps'));
+  const maps = (s) => (s.match(/= new (?:mapboxgl|maplibregl)\.Map\(/g) || []).length;
+  assert.strictEqual(maps(sidebar), 3);
+  assert.strictEqual(maps(slide.slice(0, slide.indexOf('function recenterMap'))), 4);
+});
+
+test('both map families are idempotent', () => {
+  assert.ok(/function initSidebarBasemaps\(\) \{\s*\n\s*if \(minimap\) return;/.test(radar));
+  assert.ok(/function initSlideBasemaps\(\) \{\s*\n\s*if \(map\) return;/.test(radar));
+});
+
+/**
+ * The deferred surfaces must exist by the time a radar slide asks for them.
+ * The scheduled build is the normal path; these are the backstop for a display
+ * that reaches one early, or that is parked in a background tab where idle
+ * callbacks and timers are throttled.
+ */
+test('the radar entry points build the deferred surfaces on demand', () => {
+  for (const fn of ['recenterMap', 'fadeMap']) {
+    const body = radar.slice(radar.indexOf(`function ${fn}(`));
+    assert.ok(/initSlideBasemaps\(\)/.test(body.slice(0, body.indexOf('\n}'))),
+      `${fn} does not ensure the slide surfaces exist`);
+  }
+});
+
+test('boot waits for the location rather than a stopwatch', () => {
+  assert.ok(!/setTimeout\(function\(\) \{\s*\n\s*initBasemaps\(\)/.test(manager),
+    'boot is back on a fixed timer; maps can be built before the location resolves');
+  assert.ok(/bootDataReady\.then\(/.test(manager));
+  assert.ok(/bootRevealed\.then\(/.test(manager));
+  // Without the backstop, data that never lands means a display that never boots.
+  assert.ok(/setTimeout\(bootDataReady\.reach, \d+\)/.test(manager));
+  // The milestone has to be the data landing, not the location resolving:
+  // Loops() paints the sidebar once and then not again for five minutes.
+  const resolved = manager.slice(manager.indexOf('function onMainLocationResolved'));
+  assert.ok(!/bootDataReady\.reach\(\)/.test(resolved.slice(0, resolved.indexOf('\n}'))),
+    'boot is signalled when the location resolves, before any data has arrived');
+  assert.ok(/function grabSideandLowerBarData[\s\S]*?bootDataReady\.reach\(\)/.test(manager));
+});
+
+test('the slide surfaces are not built alongside the reveal', () => {
+  // requestIdleCallback on its own fires within a second of the reveal, because
+  // the browser genuinely is idle then. The settle is what moves the work.
+  assert.ok(/SLIDE_MAP_SETTLE_MS\s*=\s*(\d+)/.test(manager));
+  const settle = Number(/SLIDE_MAP_SETTLE_MS\s*=\s*(\d+)/.exec(manager)[1]);
+  assert.ok(settle >= 8000, `settle is ${settle}ms; too close to the reveal to help`);
+  assert.ok(/setTimeout\(function \(\) \{ whenIdle\(initSlideBasemaps, \d+\); \}, SLIDE_MAP_SETTLE_MS\)/
+    .test(manager));
+});
+
+test('whenIdle always sets a hard timer as well', () => {
+  const body = manager.slice(manager.indexOf('function whenIdle('));
+  const fn = body.slice(0, body.indexOf('\n}'));
+  assert.ok(/requestIdleCallback\(fn/.test(fn));
+  assert.ok(/(^|\n)\s*setTimeout\(fn, timeout\)/.test(fn),
+    'a background tab may never be given an idle callback');
+});
+
+test('the first slide is not left waiting behind the reveal', () => {
+  const body = slidesLoop.slice(slidesLoop.indexOf('function Slides()'));
+  const start = /showSlides\(0\)\s*\n\s*\}, (\d+)\)/.exec(body);
+  assert.ok(start, 'Slides() no longer schedules its first slide the expected way');
+  assert.ok(Number(start[1]) <= 100,
+    `first slide is ${start[1]}ms behind the reveal; the display sits empty that long`);
+});
+
+test('weatherInfo is built once the location is known, in one place', () => {
+  // Four copies of the same four calls, one per branch of getMainLoc, is how
+  // the geocode branch came to read adminDistrict with an index that only the
+  // search branch ever set.
+  assert.strictEqual((manager.match(/^\s*onMainLocationResolved\(\)/gm) || []).length, 4,
+    'expected one call per branch of getMainLoc');
+  assert.ok(/function onMainLocationResolved\(\)/.test(manager));
+  assert.ok(!/data\.location\.adminDistrict\[cidx\]/.test(
+    manager.slice(manager.indexOf('location/point?geocode='), manager.indexOf('locationType='))),
+    'the point branch is subscripting a scalar again');
+});
