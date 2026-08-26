@@ -76,27 +76,30 @@ function toPlace(r) {
   };
 }
 
+/** One city from the bundled index, in the shape reverse() answers with. */
+function placeFromIndex(c, lat, lon) {
+  return {
+    name: c.name,
+    lat: Number(lat),
+    lon: Number(lon),
+    state: c.state,
+    stateName: STATE_NAMES[c.state] || c.state,
+    admin2: '',
+    country: 'US',
+    countryName: 'United States',
+    locality: c.name,
+    city: c.name,
+    population: c.population,
+  };
+}
+
 async function reverse(lat, lon) {
   return cache.wrap(`geo:r:${fix(lat)},${fix(lon)}`, config.cache.geocodeMs, async () => {
     // Prefer the bundled index for US points. Web reverse-geocoders answer
     // rural US coordinates with civil-township names — "Cunningham District"
     // rather than "Crozet" — which is not what belongs on a weather display.
     const c = places.nearest(lat, lon, 15);
-    if (c) {
-      return {
-        name: c.name,
-        lat: Number(lat),
-        lon: Number(lon),
-        state: c.state,
-        stateName: STATE_NAMES[c.state] || c.state,
-        admin2: '',
-        country: 'US',
-        countryName: 'United States',
-        locality: c.name,
-        city: c.name,
-        population: c.population,
-      };
-    }
+    if (c) return placeFromIndex(c, lat, lon);
 
     // Open-Meteo has no reverse endpoint; BigDataCloud's is free and key-free.
     const url =
@@ -122,9 +125,24 @@ async function reverse(lat, lon) {
         city: d.city || '',
       };
     } catch {
-      // Last resort: the nearest populated place from the forward index.
-      const near = await nearby(lat, lon, 1);
-      if (near.length) return near[0];
+      // Last resort: the nearest populated place from the forward index, at a
+      // wider radius than the preferred lookup above — reaching here means the
+      // point is rural enough that nothing qualified within fifteen miles.
+      //
+      // It must not go through nearby(), which is where it used to go, because
+      // nearby() opens by awaiting reverse() for these same coordinates. The
+      // key is already in flight — this producer is what is running under it —
+      // so cache.wrap handed the recursive call the very promise it was itself
+      // producing, and it awaited itself. That never settles, and the in-flight
+      // entry is only cleared in a finally that therefore never runs, so the
+      // key stayed poisoned for the life of the process: every later reverse()
+      // for the point hung too, which hung /v3/location/point and
+      // /v3/location/near, which left the frontend with no city list at all.
+      //
+      // places.nearest is synchronous and touches no cache, so there is no
+      // cycle to fall into.
+      const indexed = places.nearest(lat, lon, 60);
+      if (indexed) return placeFromIndex(indexed, lat, lon);
       return {
         name: `${Number(lat).toFixed(2)}, ${Number(lon).toFixed(2)}`,
         lat: Number(lat), lon: Number(lon),
