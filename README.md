@@ -6,7 +6,7 @@ weather API key.
 
 ![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)
 ![Runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-blue.svg)
-![Tests](https://img.shields.io/badge/tests-112-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-120-brightgreen.svg)
 ![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
@@ -254,6 +254,23 @@ broken slide, and it names the entry rather than just the symptom:
        slideLoopSettings.order[1](health).slideOrder[0][0]: no slide named "healthIntroo"
 ```
 
+**Four more bugs, from reworking the boot sequence.** The sidebar painted its
+temperature and conditions icon once when `Loops()` was constructed and then not
+again for five minutes, so any run where the observation data landed after that
+point showed a blank temperature for the rest of the interval; boot now waits
+for that data rather than for the location alone. The geocode branch of the
+location lookup read `data.location.adminDistrict[cidx]` — a point response is
+scalar throughout, and `cidx` is only ever assigned by the *search* branch, so a
+configured geocode location looked up its ticker cities for no state at all.
+Every map centres on `maincitycoords`, and nothing tied the old fixed timer to
+the lookup having landed, so a slow or retrying lookup built all seven around
+empty coordinates. And three more `cidx` assignments were undeclared, putting
+the name on `window`.
+
+The four branches of `getMainLoc` ended with the same four init calls written
+out again, which is how the `adminDistrict` bug came to exist in exactly one of
+them. They share one function now.
+
 **No CDN scripts at boot.** jQuery, the marquee plugin, mapbox-gl and
 maplibre-gl were pulled from googleapis, jsdelivr and unpkg on every page load,
 so a display that could not reach those hosts did not start. They are vendored
@@ -292,6 +309,9 @@ shows up — as slides that feel heavy and transitions that judder.
 | Vendor JS, repeat request | 34 ms of CPU, every time | 48 ms once, then 1.5 ms |
 | Vendor JS caching | revalidated on every page load | cached for a week |
 | Slide-header transition | jQuery tween of `left` — full relayout per frame | compositor-only transform |
+| WebGL contexts live when the display appears | 7 | 3 |
+| Main-thread blocking after the reveal | 88 ms before it, 56 ms after | none |
+| Reveal → first slide on screen | 1.0 s of empty display | 0 ms |
 | Temperature-bar growth | jQuery tween of `height` — full relayout per frame, 4 bars at once | compositor-only transform |
 
 **The icon sprite sheets are animated PNGs.** `images/icons2010sprite.png` and
@@ -338,6 +358,48 @@ CSS animation and should be immune to whatever else the page is doing. They now
 get their final height up front and scale up from zero, which the compositor
 handles on its own. The labels inside are `opacity: 0` until the growth
 finishes, so there is nothing visible to distort on the way up.
+
+**Seven map surfaces were built one second before the display appeared.** The
+whole boot hung off `setTimeout(…, 4000)` — "init 1 second before intro stops" —
+so `initBasemaps()`, the slide engine, the sidebar loops and the ticker manager
+all landed in the same moment the intro card lifts. `initBasemaps()` builds
+*seven* mapbox-gl and maplibre-gl instances: seven WebGL contexts, seven style
+parses and seven rounds of tile fetching, measured at 88 ms of main-thread
+blocking immediately before the reveal. Only three of them are the sidebar
+stack. The other four are the full-screen doppler trio and the satellite view,
+which nothing looks at until the first radar slide roughly forty seconds into
+the loop.
+
+It is the same failure as the temperature bars above, one layer up: the ticker
+is a compositor-driven CSS animation that should be immune to what the page is
+doing, and a blocked main thread is the one thing it cannot survive. Boot is the
+worst case because everything arrives at once.
+
+Three smaller costs were stacked into the same window. The intro spinner
+rewrote `transition: transform 1s linear` *and* the transform every 100 ms, so a
+one-second transition restarted ten times a second on a 3D-transformed element
+for the whole intro. The city background PNGs (286–424 KB) sit on containers
+that are `display:none` until their slide shows, so the browser did not request
+them until the first transition — they arrived about a second and a half after
+the reveal and decoded over the top of the slide that wanted them. And `Slides()`
+waits two seconds after being constructed, so the display appeared with its
+header and sidebar up and nothing in the middle of it for a full second.
+
+Boot now runs on readiness rather than a stopwatch. `initBasemaps()` is split
+into `initSidebarBasemaps()` and `initSlideBasemaps()`, both idempotent, and the
+radar slides build the deferred four on demand if they ever get there first. The
+warmup — three maps, the sidebar loops, the ticker manager, and an explicit
+preload of the backgrounds the first slides paint — moves into the four idle
+seconds *behind* the intro card, where nothing the viewer can see is moving.
+Only the slide rotation waits for the curtain, and it now starts with it rather
+than a second later. Measured after: one 57 ms task at t=154 ms, behind the
+card, and nothing at all after the reveal.
+
+The deferred surfaces need one more thing: `requestIdleCallback` on its own
+fires within half a second of the reveal, because the browser genuinely is idle
+then, which put all four right back into the window this exists to protect.
+They wait a fixed settle first, and a hard timer runs alongside the idle
+callback because a display parked in a background tab may never be given one.
 
 **Static assets are compressed once.** Every request used to re-run gzip over
 the file — 34 ms of CPU for `mapbox-gl.js` alone, on a container capped at a
@@ -554,7 +616,7 @@ every shape inspectable with `curl`.
 
 ```bash
 npm run dev      # auto-restart, request logging
-npm test         # 112 tests, no dependencies
+npm test         # 120 tests, no dependencies
 npm run check    # probe every data source, and validate config.js
 npm run split-icons  # cut the animated icon sheets into per-icon files
 ```
@@ -572,6 +634,13 @@ an endpoint that hangs fails by name instead of stalling the run.
 [above](#what-changed) — no browser, no fixtures to keep in step, and the
 `weatherInfo` it runs against is built from the shape `config.js` declares, so
 adding a field there reaches the tests without anyone remembering to.
+
+It also pins the boot order, which is load-bearing for how the display *feels*
+and easy to undo by accident: that the map surfaces stay split three and four,
+that both families are idempotent and the radar slides can build theirs on
+demand, that the settle before the deferred four is long enough to be worth
+having, and that boot waits on data rather than on the location. None of that
+is visible to a test that only checks output.
 
 `docker build` runs `split-icons` for you. Run it by hand for a local `npm
 start`, or the frontend falls back to the 20 MB animated sprite sheets and the
