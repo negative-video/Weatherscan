@@ -481,7 +481,7 @@ var weatherInfoSettings = {
       {name:"",cond:"",icon:"",high:"",low:"",windspeed:""}
     ]},*/
     weatherLocs:[]
-  }, almanac: {displayname:"",date:"",avghigh:"",avglow:"",rechigh:"",reclow:"",rechighyear:"",reclowyear:"",sunrise:"",sunset:"",moonphases:[
+  }, almanac: {noReport:false,displayname:"",date:"",avghigh:"",avglow:"",rechigh:"",reclow:"",rechighyear:"",reclowyear:"",sunrise:"",sunset:"",moonphases:[
     {name:"NEW",date:"Feb 10"},
     {name:"FIRST",date:"Feb 16"},
     {name:"FULL",date:"Feb 21"},
@@ -513,7 +513,7 @@ var weatherInfoSettings = {
   ], delays: [],
     //{iato:"",type:"",amount:"",amountmin:"",reason:""}
    otherairports:[
-    {displayname:"New York / LaGaurdia",iata:"LGA",delay:"No Delay",temp:"",icon:"",windspeed:""},
+    {displayname:"New York / LaGuardia",iata:"LGA",delay:"No Delay",temp:"",icon:"",windspeed:""},
     {displayname:"Chicago O'hare Int'l",iata:"ORD",delay:"No Delay",temp:"",icon:"",windspeed:""},
     {displayname:"Los Angeles Int'l",iata:"LAX",delay:"No Delay",temp:"",icon:"",windspeed:""},
     {displayname:"Atlanta International",iata:"LAX",delay:"No Delay",temp:"",icon:"",windspeed:""},
@@ -530,9 +530,32 @@ var weatherInfoSettings = {
     {displayname:"Seattle - Tacoma Int'l",iata:"SEA",delay:"No Delay",temp:"",icon:"",windspeed:""},
     {displayname:"Lambert - St. Louis Int'l",iata:"STL",delay:"No Delay",temp:"",icon:"",windspeed:""},
   ]},
+  // Cities for the Travel and International slides. Both lists are read
+  // straight through by fillThreeDayPanes, three cities to a page.
+  travel:{noReport:false,cities:[
+   {displayname:"New York City",lat:"40.7306",lon:"-73.9352",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+   {displayname:"Chicago",lat:"41.8818",lon:"-87.6231",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+   {displayname:"Los Angeles",lat:"34.0522",lon:"-118.2436",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+   {displayname:"Atlanta",lat:"33.7537",lon:"-84.3863",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+   {displayname:"Dallas",lat:"32.7791",lon:"-96.8088",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+   {displayname:"Boston",lat:"42.3611",lon:"-71.0570",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+   {displayname:"Orlando",lat:"28.5383",lon:"-81.3792",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+   {displayname:"Washington, DC",lat:"38.8951",lon:"-77.0364",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+   {displayname:"San Francisco",lat:"37.7739",lon:"-122.4312",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]}
+ ]},
+ international:{noReport:false,cities:[
+  {displayname:"Toronto",lat:"43.6510",lon:"-79.3470",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+  {displayname:"London",lat:"51.5098",lon:"-0.1180",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+  {displayname:"Paris",lat:"48.8647",lon:"2.3490",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+  {displayname:"Madrid",lat:"40.4167",lon:"-3.7037",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+  {displayname:"Tokyo",lat:"35.6528",lon:"139.8394",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+  {displayname:"Mexico City",lat:"19.4326",lon:"-99.1332",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+  {displayname:"Rome",lat:"41.9027",lon:"12.4963",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+  {displayname:"Rio de Janeiro",lat:"-22.9083",lon:"-43.1963",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
+  {displayname:"Hong Kong",lat:"22.3027",lon:"114.1772",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]}
+]},
   ccticker: {noReportCC:false,noReportFC:false,noReportAC:false,arrow:"",ccLocs:[],ccairportdelays:[]},
   radarTempUnavialable: false,
   radarWinterLegend: false,
   reboot: false,
-  ad: "You are watching an emulation of the Weatherscan IntelliStar system. Weatherscan is a digital cable and satellite television network that is owned by a consortium owned in turn by NBCUniversal and investment firms The Blackstone Group and Bain Capital. A spinoff of The Weather Channel, Weatherscan features uninterrupted local weather information in graphical format on a continuous loop that is generated by an IntelliStar unit installed at the cable provider's headend; unlike The Weather Channel, Weatherscan does not feature on-air talent of any kind."
 }

@@ -337,116 +337,23 @@ function getExtraLocs(lat,lon, onInit, whichReset) {
   }
 
 
-var weatherInfo = { currentCond: {
-  sidebar: {noReport:false,displayname:"",temp:"",cond:"",icon:"",humid:"",dewpt:"",pressure:"",wind:"",windspeed:"",gust:"",feelslike:{type:"",val:""},visibility:"",uvidx:"",ceiling:""},
-  //loc:{noReport:"",displayname:"",temp:"",cond:"",icon:"",humid:"",dewpt:"",pressure:"",pressureTrend:"",wind:"",windspeed:"",gust:"",feelslike:{type:"",val:""},},
-  weatherLocs:[],
-  //cityLoc:{noReport:false,displayname:"",temp:"",icon:"",wind:"",windspeed:""}
-  city8slides:{noReport:false, cities:[]},
-}, dayPart: {
-  lowerbar:{noReport:false,displayname:"",daytitle:"",hour:[{time:"",cond:"",icon:"",temp:"",wind:"",windspeed:""},{time:"",cond:"",icon:"",temp:"",wind:"",windspeed:""},{time:"",cond:"",icon:"",temp:"",wind:"",windspeed:""},{time:"",cond:"",icon:"",temp:"",wind:"",windspeed:""},]},
-  /*loc:{noReport:"",displayname:"",daytitle:"",hour:[
-    {time:"",cond:"",icon:"",temp:"",wind:"",windspeed:""},
-    {time:"",cond:"",icon:"",temp:"",wind:"",windspeed:""},
-    {time:"",cond:"",icon:"",temp:"",wind:"",windspeed:""},
-    {time:"",cond:"",icon:"",temp:"",wind:"",windspeed:""},
-  ]},*/
-  weatherLocs:[],
-}, dayDesc: {
-  lowerbar: {noReport:false,displayname:"",day:[{name:"",desc:""},{name:"",desc:""},{name:"",desc:""},{name:"",desc:""}]},
-  /*loc:{noReport:"",displayname:"",day:[
-    {name:"",desc:""},
-    {name:"",desc:""},
-    {name:"",desc:""},
-    {name:"",desc:""}
-  ]},*/
-  weatherLocs:[]
-}, fiveDay: {
-    lowerbar: {noReport:false,displayname:"",day:[{name:"",cond:"",icon:"",high:"",low:"",windspeed:"",weekend:""},{name:"",cond:"",icon:"",high:"",low:"",windspeed:"",weekend:""},{name:"",cond:"",icon:"",high:"",low:"",windspeed:"",weekend:""},{name:"",cond:"",icon:"",high:"",low:"",windspeed:"",weekend:""},{name:"",cond:"",icon:"",high:"",low:"",windspeed:"",weekend:""}]},
-    /*loc:{noReport:"",displayname:"",day:[
-      {name:"",cond:"",icon:"",high:"",low:"",windspeed:""},
-      {name:"",cond:"",icon:"",high:"",low:"",windspeed:""},
-      {name:"",cond:"",icon:"",high:"",low:"",windspeed:""},
-      {name:"",cond:"",icon:"",high:"",low:"",windspeed:""},
-      {name:"",cond:"",icon:"",high:"",low:"",windspeed:""}
-    ]},*/
-    weatherLocs:[]
-  }, almanac: {noReport:false,displayname:"",date:"",avghigh:"",avglow:"",rechigh:"",reclow:"",rechighyear:"",reclowyear:"",sunrise:"",sunset:"",moonphases:[
-    {name:"NEW",date:"Feb 10"},
-    {name:"FIRST",date:"Feb 16"},
-    {name:"FULL",date:"Feb 21"},
-    {name:"LAST",date:"Feb 27"},
-  ]}, bulletin: {
-    //loc:{displayname:"",pages:[]},
-    includesevereonbulletin: false,
-    weatherLocs:[],
-    severewarnings:[],
-    //{name:"", desc:"", status:""}
-    marqueewarnings:[],
-    severeweathermode: false
-    //{name:"", desc:"", status:"", significance:""}
-  }, healthforecast: {noReport:false, displayname:"",dayidx:0, day:"", high:"", low:"", precipChance:"", humid:"", wind:"",windspeed:"", icon:""
-  }, healthPollen: {noReport:false, displayname:"", total:"", totalcat:"", date:"", types:[
-    {type:"tree", treetype:"", pollenidx:""},
-    {type:"grass", pollenidx:""},
-    {type:"weed", pollenidx:""},
-    {type:"mold", pollenidx:""},
-  ]}, healthAcheBreath: {noReport:false, date:"",achesindex:"",achescat:"",breathindex:"",breathcat:""
-  },  airquality: {noReport:false, date:"",ozoneactin: false, primarypolute:"", airqualityindex:""
-  },  uvindex: {noReport:false, currentuv:{index:"",desc:""},forecast:[
-    {day:"",time:"",index:"",desc:""},
-    {day:"",time:"",index:"",desc:""},
-    {day:"",time:"",index:"",desc:""}
-  ]}, airport: {noReport: false, mainairports:[
-    {displayname:"",iata:"MIA",arrivals:{delay:"No Delay",reason:""},departures:{delay:"No Delay",reason:""},temp:"",cond:"",icon:"",windspeed:""},
-    {displayname:"",iata:"MCO",arrivals:{delay:"No Delay",reason:""},departures:{delay:"No Delay",reason:""},temp:"",cond:"",icon:"",windspeed:""}
-  ], delays: [],
-    //{iato:"",type:"",amount:"",amountmin:"",reason:""}
-   otherairports:[
-    {displayname:"New York / LaGuardia",iata:"LGA",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Chicago O'hare Int'l",iata:"ORD",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Los Angeles Int'l",iata:"LAX",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Atlanta International",iata:"LAX",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Dallas / Ft. Worth Int'l",iata:"DFW",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Denver International",iata:"DEN",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Boston / Logan Int'l",iata:"BOS",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Salt Lake City Int'l",iata:"SLC",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Miami International",iata:"MIA",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Phoenix / Sky Harbor",iata:"PHX",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Minneapolis - St. Paul",iata:"MSP",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Washington Dulles Int'l",iata:"IAD",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"San Francisco Int'l",iata:"SFO",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Philadelphia Int'l",iata:"PHL",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Seattle - Tacoma Int'l",iata:"SEA",delay:"No Delay",temp:"",icon:"",windspeed:""},
-    {displayname:"Lambert - St. Louis Int'l",iata:"STL",delay:"No Delay",temp:"",icon:"",windspeed:""},
-  ]},
-  travel:{noReport:false,cities:[
-   {displayname:"New York City",lat:"40.7306",lon:"-73.9352",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-   {displayname:"Chicago",lat:"41.8818",lon:"-87.6231",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-   {displayname:"Los Angeles",lat:"34.0522",lon:"-118.2436",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-   {displayname:"Atlanta",lat:"33.7537",lon:"-84.3863",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-   {displayname:"Dallas",lat:"32.7791",lon:"-96.8088",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-   {displayname:"Boston",lat:"42.3611",lon:"-71.0570",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-   {displayname:"Orlando",lat:"28.5383",lon:"-81.3792",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-   {displayname:"Washington, DC",lat:"38.8951",lon:"-77.0364",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-   {displayname:"San Francisco",lat:"37.7739",lon:"-122.4312",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]}
- ]},
- international:{noReport:false,cities:[
-  {displayname:"Toronto",lat:"43.6510",lon:"-79.3470",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-  {displayname:"London",lat:"51.5098",lon:"-0.1180",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-  {displayname:"Paris",lat:"48.8647",lon:"2.3490",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-  {displayname:"Madrid",lat:"40.4167",lon:"-3.7037",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-  {displayname:"Tokyo",lat:"35.6528",lon:"139.8394",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-  {displayname:"Mexico City",lat:"19.4326",lon:"-99.1332",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-  {displayname:"Rome",lat:"41.9027",lon:"12.4963",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-  {displayname:"Rio de Janeiro",lat:"-22.9083",lon:"-43.1963",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]},
-  {displayname:"Hong Kong",lat:"22.3027",lon:"114.1772",days:[{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""},{dayName:"",icon:"",high:"",low:"",windspeed:""}]}
-]},
-  ccticker: {noReportCC:false,noReportFC:false,noReportAC:false,arrow:"",ccLocs:[],ccairportdelays:[]},
-  radarTempUnavialable: false,
-  radarWinterLegend: false,
-  reboot: false,
-}
+/**
+ * The live weather record, built from the shape config.js declares.
+ *
+ * This used to be a second copy of that shape, written out in full here, and
+ * the two had already drifted in both directions. config.js gained a
+ * pressureTrend — with a comment recording that the sidebar printed "pressure
+ * undefined" without it — but the copy that actually ran never did, so the fix
+ * had no effect at all. travel and international went the other way: they only
+ * ever existed here, which is why editing their city lists in config.js did
+ * nothing. One of the two was always going to be the one nobody edited.
+ *
+ * config.js loads first (see index.html), so the shape is there by the time
+ * this runs. JSON round-trip rather than a shared reference, so
+ * weatherInfoSettings stays the pristine declared shape after the display has
+ * filled this one in.
+ */
+var weatherInfo = JSON.parse(JSON.stringify(weatherInfoSettings));
 
 //start data functions. these are run after their respective location functions finish
 function grabCity8SlidesData() {
