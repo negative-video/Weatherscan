@@ -109,7 +109,166 @@ function mapboxBaseTiles() {
     '/tiles/{z}/{x}/{y}?access_token=' + map_key;
 }
 
-function initBasemaps() {
+/**
+ * The map surfaces, in two families, created at different times.
+ *
+ * There are seven of them and they used to be built in one call a second before
+ * the intro card lifts: seven WebGL contexts, seven style parses and seven
+ * rounds of tile fetching landing in the same moment the display becomes
+ * visible and the ticker starts scrolling in front of the viewer.
+ *
+ * Only three are needed then. The mini stack sits in the sidebar for the life
+ * of the page. The other four -- the full-screen doppler trio and the satellite
+ * view -- are not looked at until the first radar slide, a minute into the
+ * loop, so they are built once the display has settled instead.
+ *
+ * Both are idempotent, and the deferred family is also created on demand by the
+ * radar slides, so a display that reaches one early builds what it needs rather
+ * than drawing nothing.
+ */
+function initSidebarBasemaps() {
+	if (minimap) return;
+	mapboxgl.accessToken = map_key
+	//minimap
+	minimap = new mapboxgl.Map({
+		container: 'minimap-3', // container ID
+		style: mapboxStyle('miniStyle', 'mapbox://styles/goldbblazez/cl11ctjbl000014s02fijkmyc'), // style URL
+		center: [maincitycoords.lon, maincitycoords.lat], // starting position [lng, lat]
+		zoom: 6, // starting zoom
+		sprite: "mapbox://styles/goldbblazez/cl11ctjbl000014s02fijkmyc/f2jmfbiv3wccsb4w7xb1prfmc"
+	});
+	minibasemap = new maplibregl.Map({
+		container: 'minimap-1', // container ID // style URL
+		style: {
+				'version': 8,
+				'sources': {
+				'raster-tiles': {
+				'type': 'raster',
+					'tiles': [
+						mapboxBaseTiles()
+					],
+					'tileSize': 512,
+					'minzoom': 6,
+					'maxzoom': 8,
+					},
+				},
+				'layers': [
+					{
+					'id': 'basemap',
+					'type': 'raster',
+					'source': 'raster-tiles',
+					'layout': { 'visibility': 'visible'},
+					'minzoom': 0,
+					'maxzoom': 22
+					}
+				]
+		},
+		center: [maincitycoords.lon, maincitycoords.lat], // starting position [lng, lat]
+		zoom: 6, // starting zoom
+	});
+	//render a whole separate map just to do dropshadow
+	miniradar = new maplibregl.Map({
+		container: 'minimap-2', // container ID // style URL
+		style: {
+				'version': 8,
+				'sources': {
+				'raster-tiles': {
+				'type': 'raster',
+				'tiles': [
+				// RainViewer radar tiles - timestamp will be updated dynamically
+				rainViewerConfig.getRadarTileUrl(Math.floor(Date.now() / 1000))
+				],
+				'tileSize': 256,
+				}
+			},
+			'layers': [
+				{
+				'id': 'simple-tiles',
+				'type': 'raster',
+				'source': 'raster-tiles',
+				'layout': { 'visibility': 'visible'},
+				'minzoom': 0,
+				'maxzoom': 22
+				}
+			]
+		},
+		center: [maincitycoords.lon, maincitycoords.lat], // starting position [lng, lat]
+		zoom: 6, // starting zoom
+	});
+	minimap.on('load', () => {
+		//a bunch of code just to add the sim's city onto the map.
+			minimap.addSource('maincitypoint', {
+				'type': 'geojson',
+				'data': {
+					'type': 'FeatureCollection',
+					'features': [
+						{
+							'type': 'Feature',
+							'geometry': {
+								'type': 'Point',
+								'coordinates': [maincitycoords.lon, maincitycoords.lat]
+							},
+						}
+					]
+				}
+			});
+			minimap.addLayer({
+					'id': 'maincityshadow',
+					'type': 'symbol',
+					'source': 'maincitypoint', // reference the data source
+					'layout': {
+						'text-field': maincitycoords.displayname,
+						// Same stack the styles use. Mapbox serves a comma-separated
+						// stack by skipping fonts the account does not have, but a bare
+						// "Frutiger Bold" 404s outright and the label never draws.
+						'text-font': ["Frutiger Bold", "Arial Unicode MS Regular"],
+						'text-size': 28,
+						'text-line-height': 1.2,
+						'text-max-width': 10,
+						'text-variable-anchor': ['top', 'top-left', 'top-right', 'bottom', 'bottom-left', 'bottom-right', 'left', 'right'],
+						'text-radial-offset': 0.45,
+						'text-justify': 'auto',
+						'icon-image': 'locatordot2', // reference the image
+						'icon-size': 1.45
+				},
+				'paint': {
+					'text-translate': [0,11],
+					'text-color': "#171717",
+					'icon-opacity': 0,
+				}
+			});
+			minimap.addLayer({
+					'id': 'maincity',
+					'type': 'symbol',
+					'source': 'maincitypoint', // reference the data source
+					'layout': {
+						'text-field': maincitycoords.displayname,
+						// Same stack the styles use. Mapbox serves a comma-separated
+						// stack by skipping fonts the account does not have, but a bare
+						// "Frutiger Bold" 404s outright and the label never draws.
+						'text-font': ["Frutiger Bold", "Arial Unicode MS Regular"],
+						'text-size': 28,
+						'text-line-height': 1.2,
+						'text-max-width': 10,
+						'text-variable-anchor': ['top', 'top-left', 'top-right', 'bottom', 'bottom-left', 'bottom-right', 'left', 'right'],
+						'text-radial-offset': 0.45,
+						'text-justify': 'auto',
+						'icon-image': 'locatordot2', // reference the image
+						'icon-size': 1.45
+				},
+				'paint': {
+					'text-translate': [0,8],
+					'text-color': "#d4d4d4"
+				}
+			});
+	});
+
+}
+
+/** The full-screen doppler stack and the satellite view. See initSidebarBasemaps. */
+function initSlideBasemaps() {
+	if (map) return;
+	mapboxgl.accessToken = map_key
 	//main map
 	mapboxgl.accessToken = map_key
 	map = new mapboxgl.Map({
@@ -276,140 +435,10 @@ function initBasemaps() {
 			fadeMap('satrad-1', false)
 		});
 
-	//minimap
-	minimap = new mapboxgl.Map({
-		container: 'minimap-3', // container ID
-		style: mapboxStyle('miniStyle', 'mapbox://styles/goldbblazez/cl11ctjbl000014s02fijkmyc'), // style URL
-		center: [maincitycoords.lon, maincitycoords.lat], // starting position [lng, lat]
-		zoom: 6, // starting zoom
-		sprite: "mapbox://styles/goldbblazez/cl11ctjbl000014s02fijkmyc/f2jmfbiv3wccsb4w7xb1prfmc"
-	});
-	minibasemap = new maplibregl.Map({
-		container: 'minimap-1', // container ID // style URL
-		style: {
-				'version': 8,
-				'sources': {
-				'raster-tiles': {
-				'type': 'raster',
-					'tiles': [
-						mapboxBaseTiles()
-					],
-					'tileSize': 512,
-					'minzoom': 6,
-					'maxzoom': 8,
-					},
-				},
-				'layers': [
-					{
-					'id': 'basemap',
-					'type': 'raster',
-					'source': 'raster-tiles',
-					'layout': { 'visibility': 'visible'},
-					'minzoom': 0,
-					'maxzoom': 22
-					}
-				]
-		},
-		center: [maincitycoords.lon, maincitycoords.lat], // starting position [lng, lat]
-		zoom: 6, // starting zoom
-	});
-	//render a whole separate map just to do dropshadow
-	miniradar = new maplibregl.Map({
-		container: 'minimap-2', // container ID // style URL
-		style: {
-				'version': 8,
-				'sources': {
-				'raster-tiles': {
-				'type': 'raster',
-				'tiles': [
-				// RainViewer radar tiles - timestamp will be updated dynamically
-				rainViewerConfig.getRadarTileUrl(Math.floor(Date.now() / 1000))
-				],
-				'tileSize': 256,
-				}
-			},
-			'layers': [
-				{
-				'id': 'simple-tiles',
-				'type': 'raster',
-				'source': 'raster-tiles',
-				'layout': { 'visibility': 'visible'},
-				'minzoom': 0,
-				'maxzoom': 22
-				}
-			]
-		},
-		center: [maincitycoords.lon, maincitycoords.lat], // starting position [lng, lat]
-		zoom: 6, // starting zoom
-	});
-	minimap.on('load', () => {
-		//a bunch of code just to add the sim's city onto the map.
-			minimap.addSource('maincitypoint', {
-				'type': 'geojson',
-				'data': {
-					'type': 'FeatureCollection',
-					'features': [
-						{
-							'type': 'Feature',
-							'geometry': {
-								'type': 'Point',
-								'coordinates': [maincitycoords.lon, maincitycoords.lat]
-							},
-						}
-					]
-				}
-			});
-			minimap.addLayer({
-					'id': 'maincityshadow',
-					'type': 'symbol',
-					'source': 'maincitypoint', // reference the data source
-					'layout': {
-						'text-field': maincitycoords.displayname,
-						// Same stack the styles use. Mapbox serves a comma-separated
-						// stack by skipping fonts the account does not have, but a bare
-						// "Frutiger Bold" 404s outright and the label never draws.
-						'text-font': ["Frutiger Bold", "Arial Unicode MS Regular"],
-						'text-size': 28,
-						'text-line-height': 1.2,
-						'text-max-width': 10,
-						'text-variable-anchor': ['top', 'top-left', 'top-right', 'bottom', 'bottom-left', 'bottom-right', 'left', 'right'],
-						'text-radial-offset': 0.45,
-						'text-justify': 'auto',
-						'icon-image': 'locatordot2', // reference the image
-						'icon-size': 1.45
-				},
-				'paint': {
-					'text-translate': [0,11],
-					'text-color': "#171717",
-					'icon-opacity': 0,
-				}
-			});
-			minimap.addLayer({
-					'id': 'maincity',
-					'type': 'symbol',
-					'source': 'maincitypoint', // reference the data source
-					'layout': {
-						'text-field': maincitycoords.displayname,
-						// Same stack the styles use. Mapbox serves a comma-separated
-						// stack by skipping fonts the account does not have, but a bare
-						// "Frutiger Bold" 404s outright and the label never draws.
-						'text-font': ["Frutiger Bold", "Arial Unicode MS Regular"],
-						'text-size': 28,
-						'text-line-height': 1.2,
-						'text-max-width': 10,
-						'text-variable-anchor': ['top', 'top-left', 'top-right', 'bottom', 'bottom-left', 'bottom-right', 'left', 'right'],
-						'text-radial-offset': 0.45,
-						'text-justify': 'auto',
-						'icon-image': 'locatordot2', // reference the image
-						'icon-size': 1.45
-				},
-				'paint': {
-					'text-translate': [0,8],
-					'text-color': "#d4d4d4"
-				}
-			});
-	});
-
+	// Warm each surface's frame layers as soon as it is up, so the first radar
+	// slide has them rather than starting a series fetch on the way in.
+	map.on('load', function () { loadRadarImages('radar-1') });
+	satellitemap.on('load', function () { loadRadarImages('satrad-1') });
 }
 // How long a map surface takes to fade in or out. Matches the 500ms the slides
 // already use for their legends, and the delay they already waited before
@@ -417,6 +446,9 @@ function initBasemaps() {
 var MAP_FADE_MS = 500;
 
 function recenterMap(divID, lat, lon, zoom) {
+	// A radar slide reached before the deferred surfaces were built creates them
+	// here. Idempotent, and a no-op on every normal pass.
+	initSlideBasemaps();
 	if (divID == 'radar-1') {
 		radarmain.jumpTo({
 			center: [lon, lat],
@@ -463,6 +495,7 @@ function recenterMap(divID, lat, lon, zoom) {
  * adds them.
  */
 function fadeMap(divID, fadein, zoom) {
+	if (divID != 'minimap') initSlideBasemaps();
 	if (divID == 'radar-1') {
 		// stop() rather than letting the fades queue: a slide that is cut short
 		// would otherwise fade in only after the previous fade-out had finished
