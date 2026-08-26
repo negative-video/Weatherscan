@@ -6,7 +6,7 @@ weather API key.
 
 ![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)
 ![Runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-blue.svg)
-![Tests](https://img.shields.io/badge/tests-80-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-112-brightgreen.svg)
 ![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
@@ -172,6 +172,87 @@ returns real imagery at every zoom — so the backend keeps a rolling three-hour
 buffer of frames it has seen and serves the union. Frames older than the current
 listing are checked before being served, so an expiry shortens the loop instead
 of blanking frames.
+
+**The display stays up now.** One failure used to take the whole screen down
+until someone reloaded the page. It took two defects and a missing guard.
+
+*A cache that could deadlock on itself.* Reverse geocoding falls back to the
+bundled city index when the web geocoder fails, and it used to reach that index
+through `nearby()` — which opens by awaiting `reverse()` for the same point.
+Every lookup goes through a TTL cache that hands a second caller the promise the
+first is still producing, so the producer was handed its own promise and awaited
+itself. That never settles, and the entry is only cleared in a `finally` that
+therefore never runs: the key stayed poisoned for the life of the process, so
+every later lookup for that point hung too, which hung `/v3/location/point` and
+`/v3/location/near`, which left the frontend with no city list at all. A single
+throttled response from a free key-free endpoint was enough to trigger it, and
+rural points reach that endpoint on every lookup. The fallback reads the index
+directly now — synchronously, with no cache to re-enter.
+
+*Nothing noticed.* The cache now tracks which keys the current async context is
+producing and refuses a producer that re-enters its own key, with the cycle in
+the message. Losing one lookup is a bad minute; losing the key is a bad week.
+That guard alone is enough — run the old geocoder against it and the cycle
+throws where `nearby()` already catches, so the lookup simply succeeds.
+
+*And a slide that threw was the last slide ever shown.* Nothing drives the
+rotation but the `setTimeout` each slide schedules at its own end, so a throw
+before that line leaves nothing pending. With the city list empty, the first
+header substitution read through `weatherInfo.*.weatherLocs[location]` and died.
+The loop now skips a slide it cannot draw and carries on, backing off from one
+second to fifteen once several fail in a row, so a display running unattended
+comes back on its own when a feed recovers. Slides also claim a generation
+counter, so a timer left behind by the slide that failed cannot start a second
+rotation running alongside the first.
+
+**config.js is the configuration now.** `weatherInfo` was declared twice — once
+in `config.js` as `weatherInfoSettings`, which nothing read, and once again in
+`newweathermanager.js`, which is the copy that ran. The two had already drifted
+in both directions. A `pressureTrend` was added to `config.js` to stop the
+sidebar printing "pressure undefined", carrying a comment explaining exactly
+that, and it never reached the object on screen. The Travel and International
+city lists went the other way: they existed only in `newweathermanager.js`, so
+editing them where you were told to edit them did nothing. `config.js` is the
+single declaration now and the manager clones it, which is 93 lines shorter and
+removes the whole class of bug. Unifying them immediately caught a third
+instance: the dead copy spelled LaGuardia "LaGaurdia".
+
+**Two more frontend bugs, found by the new checks.** The pollen slide set `i = 0`
+above a `forEach` that never advanced it, so all four bars animated to the *tree*
+reading and grass, weed and mold were wrong whenever they differed from it. Four
+variables were assigned without being declared — `i` in the pollen slide, `i` in
+`resizeText`, `valueii` in the daypart slides, and `pages` in the bulletin slide,
+the only one of seven paginating slides that did not declare it — each of which
+put a name on `window` for the life of the page.
+
+**Checks that reach the frontend.** `webroot/js` is two thirds of this project
+and nothing checked any of it, which is why every defect above was found on
+screen rather than in a test. It has its own harness now: the frontend loads
+into a VM against a stubbed jQuery, so all 33 slide handlers can be run
+headlessly against a `weatherInfo` built from the declared shape — populated,
+and blank the way it is before the first fetch lands and after one fails. A
+throw there is precisely what freezes the loop, so it is the single most useful
+thing to assert. The same pass diffs the globals before and after each slide,
+which is how the four leaked names surfaced.
+
+Alongside it, the wiring itself is checked, because it is all string keys spread
+across `config.js`, `slides-loop.js` and `index.html` and every mismatch fails
+silently on screen. Every configured slide must have a handler; every handler a
+container and both header entries; every container and content pane must exist
+in `index.html`; every `*placeholder*` must be substituted; every skip test must
+compile and return a boolean. No slide property or `dataset` key may be read
+under a name nothing writes — a key differing only in case is reported
+separately, since that is never a coincidence. That last check is the
+`slidedelay` bug's exact signature.
+
+`npm run check` runs the same validator, so the file you are told to edit is
+checked before you start rather than minutes later when the loop reaches the
+broken slide, and it names the entry rather than just the symptom:
+
+```
+ FAIL  config.js    1 problem(s):
+       slideLoopSettings.order[1](health).slideOrder[0][0]: no slide named "healthIntroo"
+```
 
 **No CDN scripts at boot.** jQuery, the marquee plugin, mapbox-gl and
 maplibre-gl were pulled from googleapis, jsdelivr and unpkg on every page load,
@@ -401,7 +482,13 @@ var apperanceSettings = {
 ```
 
 `slideLoopSettings` controls the rotation; `audioSettings` the music and
-narration.
+narration. `weatherInfoSettings` declares the shape of the weather record the
+display fills in, which is where the Travel and International city lists live.
+
+Everything in here is wired to the rest of the frontend by string keys, and a
+mismatch fails silently on screen rather than raising anything. `npm run check`
+validates the file — slide names, containers, headers, placeholders and skip
+tests — and names the exact entry when one does not resolve.
 
 ---
 
@@ -467,10 +554,24 @@ every shape inspectable with `curl`.
 
 ```bash
 npm run dev      # auto-restart, request logging
-npm test         # 80 tests, no dependencies
-npm run check    # probe every configured data source
+npm test         # 112 tests, no dependencies
+npm run check    # probe every data source, and validate config.js
 npm run split-icons  # cut the animated icon sheets into per-icon files
 ```
+
+The suite covers both halves. `test/legacy.test.js` and `test/api.test.js` check
+the response shapes the frontend parses and every path it opens at startup —
+against a city the bundled index resolves locally *and* a rural point that has
+to fall through to the web geocoder, since testing only the first is how a
+deadlock in the second survived to production. Requests carry a time budget, so
+an endpoint that hangs fails by name instead of stalling the run.
+
+`test/slides.test.js` runs the frontend. `test/helpers/frontend.js` loads
+`webroot/js` into a VM against a stubbed jQuery, which is enough to execute all
+33 slide handlers and every structural check described
+[above](#what-changed) — no browser, no fixtures to keep in step, and the
+`weatherInfo` it runs against is built from the shape `config.js` declares, so
+adding a field there reaches the tests without anyone remembering to.
 
 `docker build` runs `split-icons` for you. Run it by hand for a local `npm
 start`, or the frontend falls back to the 20 MB animated sprite sheets and the
@@ -525,6 +626,14 @@ tests.
   averages are good, but record extremes are smoothed relative to an official
   station record, noticeably so on coastlines and in mountains.
 - **Nearby cities and the ticker are US-only** at full quality.
+- **The frontend checks stub the DOM rather than emulating one.** That is enough
+  to run every slide handler and catch what actually freezes the loop — a read
+  landing on undefined — and it keeps the suite dependency-free. It does mean
+  nothing there covers layout, styling, or anything that depends on a real
+  measurement. The map surfaces are not covered at all.
+- **`otherairports` lists LAX twice.** One of the sixteen ticker slots is
+  therefore wasted. It is that way in the upstream code; which airport should
+  replace it is a matter of taste, so it has been left alone.
 
 ---
 
