@@ -13,6 +13,10 @@ const assert = require('node:assert');
 const SKIP = process.env.SKIP_NETWORK_TESTS === '1';
 const LAT = 38.0293;
 const LON = -78.4767;
+// Rural enough that the bundled index has nothing inside reverse()'s preferred
+// radius, which is what pushes location lookups onto their fallback path.
+const RURAL_LAT = 38.0251;
+const RURAL_LON = -78.0042;
 
 let server;
 let base;
@@ -200,23 +204,78 @@ test('almanac produces 30-year normals with record years', { skip: SKIP }, async
   assert.ok(body.years >= 25);
 });
 
-test('the whole legacy surface answers without a 404', { skip: SKIP }, async () => {
-  const geocode = `${LAT},${LON}`;
-  const paths = [
+/**
+ * Every path the frontend opens on startup, against two kinds of point.
+ *
+ * The rural one matters as much as the city. LAT/LON is Charlottesville, which
+ * the bundled index answers directly, so reverse geocoding never reaches its
+ * web fallback and the whole failure path went untested — that is how a
+ * deadlock in it survived to production. RURAL is a point the index cannot
+ * answer within its preferred radius, so these requests take the other branch.
+ *
+ * The budget is the other half. A hung endpoint makes a bare fetch wait
+ * forever, so the suite would hang instead of failing and nobody would learn
+ * which path was at fault.
+ */
+const BUDGET_MS = 20000;
+
+async function within(path, budgetMs = BUDGET_MS) {
+  const started = Date.now();
+  let res;
+  try {
+    res = await fetch(base + path, { signal: AbortSignal.timeout(budgetMs) });
+  } catch (err) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+      assert.fail(`${path} did not answer within ${budgetMs}ms`);
+    }
+    throw err;
+  }
+  return { status: res.status, ms: Date.now() - started };
+}
+
+const startupPaths = (lat, lon) => {
+  const geocode = `${lat},${lon}`;
+  return [
     `/api/wx/v3/location/point?geocode=${geocode}`,
+    `/api/wx/v3/location/near?geocode=${geocode}`,
     `/api/wx/v3/wx/forecast/daily/5day?geocode=${geocode}`,
     `/api/wx/v3/wx/globalAirQuality?geocode=${geocode}`,
-    `/api/wx/v1/geocode/${LAT}/${LON}/observations/pollen.json`,
+    `/api/wx/v1/geocode/${lat}/${lon}/observations/pollen.json`,
     `/api/wx/v2/indices/achePain/daypart/3day?geocode=${geocode}`,
     `/api/wx/v2/indices/breathing/daypart/3day?geocode=${geocode}`,
     `/api/wx/v2/indices/uv/current?geocode=${geocode}`,
     `/api/wx/v2/indices/uv/hourly/48hour?geocode=${geocode}`,
     `/api/wx/v3/aggcommon/v3-wx-almanac-daily-1day;v3-wx-observations-current?geocode=${geocode}`,
+    `/api/wx/v3/aggcommon/v3alertsHeadlines;v3-wx-forecast-daily-5day;` +
+      `v3-wx-observations-current;v3-wx-forecast-hourly-2day?geocodes=${geocode};`,
   ];
-  for (const path of paths) {
-    const { status } = await get(path);
+};
+
+test('the whole legacy surface answers without a 404', { skip: SKIP }, async () => {
+  for (const path of startupPaths(LAT, LON)) {
+    const { status } = await within(path);
     assert.strictEqual(status, 200, `${path} returned ${status}`);
   }
+});
+
+test('the same surface answers for a point the city index cannot resolve',
+  { skip: SKIP }, async () => {
+    for (const path of startupPaths(RURAL_LAT, RURAL_LON)) {
+      const { status } = await within(path);
+      assert.strictEqual(status, 200, `${path} returned ${status}`);
+    }
+  });
+
+/**
+ * The startup burst, all at once, the way the browser issues it. Serial
+ * requests warm each other's cache entries and hide anything that only goes
+ * wrong when several callers reach one key together.
+ */
+test('the startup burst completes concurrently', { skip: SKIP }, async () => {
+  const paths = [...startupPaths(LAT, LON), ...startupPaths(RURAL_LAT, RURAL_LON)];
+  const results = await Promise.all(paths.map((p) => within(p, 30000).then((r) => ({ ...r, p }))));
+  const bad = results.filter((r) => r.status !== 200).map((r) => `${r.p} -> ${r.status}`);
+  assert.deepStrictEqual(bad, []);
 });
 
 test('uv hourly is long enough for the slide to scan', { skip: SKIP }, async () => {
