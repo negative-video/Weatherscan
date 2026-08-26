@@ -324,7 +324,7 @@ function Loops() {
 		$test = $('<div style="position:absolute;padding:0 .75% 0 11.5%;top:100%;font-family:Interstate"></div>') .appendTo('#forecast-text') .css('font-size', s + 'px') .html(text);
 		$test.css('width',$('#forecast-text').width());
 		//setTimeout(function() {
-		i = 0
+		var i = 0
 			while ($test.height() >= ($('#forecast-text').height()) && i < 10 ) {
 				s -= 1;
 				$test.css('font-size', s + 'px');

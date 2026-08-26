@@ -320,7 +320,10 @@ var mainMap
 					$('.bulletin .frost-pane').fadeIn(500);
 
 					$('#subhead-noaa').fadeIn(500);
-					pages = weatherInfo.bulletin.weatherLocs[location].pages
+					// var, like every other slide that paginates. Undeclared this went
+					// onto window and stayed there, shared with whatever else used the
+					// name — makewarningPage below closes over it either way.
+					var pages = weatherInfo.bulletin.weatherLocs[location].pages
 					makewarningPage(0)
 					function makewarningPage(warningpagenum) {
 						if (warningpagenum > 0) {
@@ -583,7 +586,7 @@ var mainMap
 				$('.info-slide-content.daypart .hour').each(function(){
 					temp = weatherInfo.dayPart.weatherLocs[location].hour[i].temp
 					value = ((temp-min)/range) * prange + 78; // find percentage of range and translate to percent and add that to the starting css % height number
-					valueii = (value/100) * 165 // multiply percentage by max height
+					var valueii = (value/100) * 165 // multiply percentage by max height
 					growBar('.info-slide-content.daypart .hour.' + hourlable[i] + ' .tempbar', valueii+"px", 1500, function(){
 						$('.info-slide-content.daypart .hour .tempbar .temp').fadeTo('slow', 1);
 						$('.info-slide-content.daypart .hour .tempbar .wind').fadeTo('slow', 1);
@@ -811,10 +814,19 @@ var mainMap
 				weatherAudio.playPollenReport();
 				$('.info-slide-content.allergy').fadeIn(500);
 				//animate pollen bars
+				//
+				// The index comes from forEach. It used to be a bare `i = 0` set
+				// once above the loop and never advanced, so all four bars read
+				// types[0] — every one of them animated to the tree reading, and
+				// grass, weed and mold were wrong whenever they differed from it.
+				// healthPollen.types is a fixed tree/grass/weed/mold array, so the
+				// position in pollentypes is the position in it.
+				//
+				// `i` was also undeclared, which put it on window for the life of
+				// the page.
 				setTimeout(function () {
-					i = 0
 					var pollentypes = ['tree', 'grass', 'weed', 'mold'];
-					pollentypes.forEach(pollentype => {
+					pollentypes.forEach(function (pollentype, i) {
 						var plength = {"0":"-10", "1":"55", "2":"115", "3":"175", "4":"235", "5":"295", "9":"-10"}[weatherInfo.healthPollen.types[i].pollenidx]
 						var ptime = {"0":0, "1":500, "2":1000, "3":1500, "4":2000, "5":2500, "9":0}[weatherInfo.healthPollen.types[i].pollenidx]
 						$('.info-slide-content.allergy .pollen .pollenbar.' + pollentype + ' .bar .bararrow').animate({left: plength + "px"}, ptime)
@@ -1438,7 +1450,7 @@ var mainMap
 					$('.info-slide-content.severe-daypart .hour').each(function(){
 						temp = weatherInfo.dayPart.weatherLocs[location].hour[i].temp
 						value = ((temp-min)/range) * prange + 78; // find percentage of range and translate to percent and add that to the starting css % height number
-						valueii = (value/100) * 165 // multiply percentage by max height
+						var valueii = (value/100) * 165 // multiply percentage by max height
 						growBar('.info-slide-content.severe-daypart .hour.' + hourlable[i] + ' .tempbar', valueii+"px", 1500, function(){
 							$('.info-slide-content.severe-daypart .hour .tempbar .temp').fadeTo('slow', 1);
 							$('.info-slide-content.severe-daypart .hour .tempbar .wind').fadeTo('slow', 1);
