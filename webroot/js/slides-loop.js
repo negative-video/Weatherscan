@@ -270,8 +270,48 @@ var mainMap
 				buildHeader();
 			}
 		}
+	// How many slides in a row have thrown, and which run of the loop is the
+	// live one. Both belong to the loop rather than to any single slide.
+	var slideFailures = 0, slideGeneration = 0;
+
+	/**
+	 * Advance the display by one slide, and survive a slide that cannot render.
+	 *
+	 * Nothing drives this loop but the setTimeout each slide schedules for its
+	 * own end, so a slide that throws before reaching that setTimeout is the last
+	 * slide the display ever shows — it sits frozen until someone reloads the
+	 * page. Missing data is the usual way in: weatherInfo.*.weatherLocs is keyed
+	 * by location index, and an index with no entry turns every substitution that
+	 * reads through it into a property read on undefined.
+	 *
+	 * Skipping the offending slide and carrying on is the right recovery. The
+	 * next slide is usually a different product whose data may well be present,
+	 * and a display that runs unattended for weeks has to be able to come back on
+	 * its own once a feed recovers.
+	 */
 	function showSlides() {
+		try {
+			renderSlide()
+			slideFailures = 0
+		} catch (err) {
+			// Back off once several fail in a row, which means the data is gone
+			// rather than one slide being unlucky. Retrying once a second for the
+			// rest of the outage would fill the console and keep two WebGL maps
+			// busy for nothing.
+			slideFailures++
+			console.error('[slides] slide ' + idx + ' threw, skipping it: ' + err.message, err)
+			idx++
+			setTimeout(showSlides, Math.min(1000 * slideFailures, 15000))
+		}
+	}
+
+	function renderSlide() {
 		var currentDisplay, location
+		// Claim the loop. A slide that threw part-way through may still have a
+		// timer of its own pending — one scheduled before the throw, or one left
+		// by a fade — and without this its wait() would fire on top of the slide
+		// the recovery already moved to, running two chains at once from then on.
+		var generation = ++slideGeneration
 			displays = {
 				bulletin() {
 					$('.bulletin .frost-pane .cityname').text(weatherInfo.bulletin.weatherLocs[location].displayname + " Area");
@@ -1743,6 +1783,9 @@ var mainMap
 
 		function wait(duration){
 			setTimeout(function() {
+				// Only the slide that currently owns the loop may advance it. See the
+				// generation claim at the top of renderSlide.
+				if (generation !== slideGeneration) return;
 				idx++
 				showSlides(idx);
 			}, duration);
